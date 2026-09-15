@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { AvatarConfig, FaceType, HatType, ToolId, BlockId } from '../types';
 import { getAvatarFaceTexture } from './textures';
 import { BLOCK_DEFINITIONS } from './blocks';
+import { soundEngine } from '../utils/audio';
+import { isOwnerName } from '../utils/ranks';
 
 export interface AvatarParts {
   root: THREE.Group;
@@ -27,6 +29,21 @@ export class CharacterAvatar {
   private walkTime: number = 0;
   private isSlashing: boolean = false;
   private slashProgress: number = 0;
+
+  // ================= WOBBLY LIFE JELLY PHYSICS STATE ================= //
+  public squashStretch: number = 1.0;
+  private squashStretchVel: number = 0.0;
+  private targetSquash: number = 1.0;
+  private wobbleTime: number = 0;
+  private turnLean: number = 0;
+  private accelPitch: number = 0;
+  private accelPitchVel: number = 0;
+  private headBobble: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private headBobbleVel: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private prevYaw: number = 0;
+  private lastStepPhase: number = 0;
+  private inAirTime: number = 0;
+  public isPlayerControlled: boolean = true;
 
   // Ragdoll disintegration state
   public isRagdoll: boolean = false;
@@ -185,31 +202,71 @@ export class CharacterAvatar {
       group.remove(group.children[0]);
     }
 
+    const isOwner = isOwnerName(text);
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = isOwner ? 320 : 256;
+    canvas.height = isOwner ? 76 : 64;
     const ctx = canvas.getContext('2d')!;
 
-    // Background capsule
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    ctx.roundRect(8, 8, 240, 48, 12);
-    ctx.fill();
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    if (isOwner) {
+      // Background capsule for Owner
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.roundRect(8, 6, 304, 64, 14);
+      ctx.fill();
 
-    // Text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px Fredoka, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text || 'Player', 128, 32);
+      // Rainbow Border
+      const rainbowGrad = ctx.createLinearGradient(10, 0, 310, 0);
+      rainbowGrad.addColorStop(0.0, '#ff1a53');
+      rainbowGrad.addColorStop(0.18, '#ff7700');
+      rainbowGrad.addColorStop(0.36, '#ffea00');
+      rainbowGrad.addColorStop(0.52, '#00ff66');
+      rainbowGrad.addColorStop(0.70, '#00e5ff');
+      rainbowGrad.addColorStop(0.85, '#7000ff');
+      rainbowGrad.addColorStop(1.0, '#ff00b7');
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(1.6, 0.4, 1);
-    group.add(sprite);
+      ctx.strokeStyle = rainbowGrad;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Top line: Rainbow OWNER rank badge
+      ctx.fillStyle = rainbowGrad;
+      ctx.font = '900 16px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👑 OWNER', 160, 24);
+
+      // Bottom line: Player name in bright crisp text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px Fredoka, sans-serif';
+      ctx.fillText(text || 'PokeFan_', 160, 49);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(2.0, 0.475, 1);
+      group.add(sprite);
+    } else {
+      // Standard member capsule
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+      ctx.roundRect(8, 8, 240, 48, 12);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 22px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text || 'Player', 128, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(1.6, 0.4, 1);
+      group.add(sprite);
+    }
   }
 
   private updateHatMesh(group: THREE.Group, hatType: HatType) {
@@ -497,53 +554,246 @@ export class CharacterAvatar {
     this.slashProgress = 0;
   }
 
-  public updateAnimation(delta: number, isMoving: boolean, isGrounded: boolean) {
+  public triggerWobblyJump(strength: number = 1.0) {
+    // Forceful jelly stretch upward
+    this.squashStretch = 1.28;
+    this.squashStretchVel = 7.0 * (strength / 8.8);
+    this.headBobbleVel.x = -6.0; // Head snaps backward with inertia
+    this.accelPitch = -0.32; // Torso tilts slightly back
+    this.targetSquash = 1.0;
+    this.inAirTime = 0;
+  }
+
+  public triggerWobblyLanding(impactForce: number = 1.0) {
+    // Squelchy jelly squash on ground contact
+    const normalizedImpact = THREE.MathUtils.clamp(impactForce, 0.4, 2.5);
+    const targetCompression = Math.max(0.58, 1.0 - normalizedImpact * 0.3);
+    this.squashStretch = targetCompression;
+    this.squashStretchVel = -normalizedImpact * 9.5;
+    this.targetSquash = 1.0;
+
+    // Head compresses down onto neck then spring bounces
+    this.headBobbleVel.x = 5.0 * normalizedImpact;
+    this.accelPitch = 0.38 * normalizedImpact;
+  }
+
+  public triggerWobblyBump(impulseX: number, impulseZ: number) {
+    this.turnLean += impulseX * 0.4;
+    this.accelPitch += impulseZ * 0.4;
+    this.headBobbleVel.z += impulseX * 8.0;
+    this.headBobbleVel.x += impulseZ * 8.0;
+    this.squashStretch = 0.82;
+    this.squashStretchVel = 5.0;
+  }
+
+  public updateAnimation(
+    delta: number,
+    isMoving: boolean,
+    isGrounded: boolean,
+    velocity?: THREE.Vector3,
+    currentYaw?: number
+  ) {
     if (this.isRagdoll) {
       this.updateRagdoll(delta);
       return;
     }
 
-    if (isMoving && isGrounded) {
-      this.walkTime += delta * 11;
-      const legSwing = Math.sin(this.walkTime) * 0.65;
-      this.parts.leftLeg.rotation.x = legSwing;
-      this.parts.rightLeg.rotation.x = -legSwing;
+    this.wobbleTime += delta;
 
-      if (!this.isSlashing) {
-        this.parts.leftArm.rotation.x = -legSwing;
-        this.parts.rightArm.rotation.x = legSwing * 0.8;
-      }
-    } else if (!isGrounded) {
-      // In air jump pose
-      this.parts.leftLeg.rotation.x = 0.35;
-      this.parts.rightLeg.rotation.x = -0.35;
-      if (!this.isSlashing) {
-        this.parts.leftArm.rotation.x = -0.6;
-        this.parts.rightArm.rotation.x = -0.6;
+    // 1. SQUASH & STRETCH JELLY SPRING DAMPER
+    const springK = 145.0;
+    const damping = 11.5;
+    const squashForce = -springK * (this.squashStretch - this.targetSquash) - damping * this.squashStretchVel;
+    this.squashStretchVel += squashForce * delta;
+    this.squashStretch += this.squashStretchVel * delta;
+    this.squashStretch = THREE.MathUtils.clamp(this.squashStretch, 0.52, 1.52);
+
+    // Volume-preserving scale on root group: when height squashes, width bulges outward!
+    const invScale = 1.0 / Math.sqrt(Math.max(0.1, this.squashStretch));
+    this.parts.root.scale.set(invScale, this.squashStretch, invScale);
+
+    // 2. YAW LEAN & INERTIAL TILT
+    if (currentYaw !== undefined) {
+      let yawDelta = currentYaw - this.prevYaw;
+      while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+      while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+      this.prevYaw = currentYaw;
+      // Lean into sharp turns (motorcycle/weeble wobble style)
+      const targetLean = THREE.MathUtils.clamp(-yawDelta * 4.5, -0.45, 0.45);
+      this.turnLean = THREE.MathUtils.lerp(this.turnLean, targetLean, 0.2);
+    } else {
+      this.turnLean = THREE.MathUtils.lerp(this.turnLean, 0, 0.1);
+    }
+
+    // Spring decay on acceleration pitch
+    this.accelPitch = THREE.MathUtils.lerp(this.accelPitch, 0, delta * 5.0);
+
+    const groundSpeed = velocity
+      ? Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
+      : (isMoving ? 6.2 : 0);
+    const vertSpeed = velocity ? velocity.y : 0;
+
+    // 3. GAIT & MODES
+    if (isGrounded) {
+      this.inAirTime = 0;
+
+      if (isMoving && groundSpeed > 0.3) {
+        // ---- WOBBLY DUCK-WADDLE WALKING ----
+        const speedMultiplier = 9.5 + groundSpeed * 0.7;
+        this.walkTime += delta * speedMultiplier;
+
+        // Step footstrike sound & gentle bounce
+        const currentStepSine = Math.sin(this.walkTime);
+        if (
+          (this.lastStepPhase <= 0 && currentStepSine > 0) ||
+          (this.lastStepPhase >= 0 && currentStepSine < 0)
+        ) {
+          if (this.isPlayerControlled) {
+            const pitch = currentStepSine > 0 ? 1.05 : 0.95;
+            soundEngine.playWobbleStep(pitch);
+          }
+          // Slight downstep compression
+          this.squashStretchVel -= 0.8;
+        }
+        this.lastStepPhase = currentStepSine;
+
+        // Waddle sway and hip bounce
+        const waddleRoll = Math.sin(this.walkTime) * 0.22;
+        const hipBounce = Math.abs(Math.sin(this.walkTime * 2)) * 0.11;
+        const hipSway = Math.sin(this.walkTime) * 0.08;
+
+        // Torso: wobbles side to side, leans forward into speed, counter-twists with steps
+        this.parts.torso.position.set(hipSway, 1.0 - hipBounce, 0);
+        this.parts.torso.rotation.z = waddleRoll + this.turnLean;
+        this.parts.torso.rotation.x = this.accelPitch + 0.14 + Math.sin(this.walkTime * 2) * 0.05;
+        this.parts.torso.rotation.y = -Math.sin(this.walkTime) * 0.16;
+
+        // Legs: comical wide stance, high bouncy stepping, snappy kick out
+        this.parts.leftLeg.rotation.z = -0.14;
+        this.parts.rightLeg.rotation.z = 0.14;
+
+        const leftLegSwing = Math.sin(this.walkTime) * 0.82;
+        const rightLegSwing = -leftLegSwing;
+        this.parts.leftLeg.rotation.x = leftLegSwing;
+        this.parts.rightLeg.rotation.x = rightLegSwing;
+
+        // Knee high lift
+        this.parts.leftLeg.position.y = 0.5 + Math.max(0, -leftLegSwing * 0.14);
+        this.parts.rightLeg.position.y = 0.5 + Math.max(0, -rightLegSwing * 0.14);
+
+        // Arms: floppy noodle flailing! Wide outward cartoon spread + rubbery swing
+        const armSwingLeft = -Math.sin(this.walkTime - 0.35) * 0.95;
+        const armSwingRight = Math.sin(this.walkTime - 0.35) * (this.heldToolId ? 0.45 : 0.95);
+        const armFlailOut = Math.cos(this.walkTime * 2) * 0.12;
+
+        this.parts.leftArm.rotation.x = armSwingLeft;
+        this.parts.leftArm.rotation.z = -0.48 - armFlailOut;
+        this.parts.leftArm.rotation.y = Math.sin(this.walkTime) * 0.28;
+
+        if (!this.isSlashing) {
+          this.parts.rightArm.rotation.x = armSwingRight;
+          this.parts.rightArm.rotation.z = 0.48 + (this.heldToolId ? 0.15 : armFlailOut);
+          this.parts.rightArm.rotation.y = -Math.sin(this.walkTime) * (this.heldToolId ? 0.12 : 0.28);
+        }
+      } else {
+        // ---- IDLE JELLY BREATHING WOBBLE ----
+        const idleBreath = Math.sin(this.wobbleTime * 2.8) * 0.035;
+        this.targetSquash = 1.0 + idleBreath;
+
+        this.parts.torso.position.set(0, 1.0, 0);
+        this.parts.torso.rotation.set(
+          idleBreath * 0.4 + this.accelPitch,
+          0,
+          Math.sin(this.wobbleTime * 1.4) * 0.02 + this.turnLean
+        );
+
+        // Relaxed cute wide stance
+        this.parts.leftLeg.rotation.set(0, 0, -0.08);
+        this.parts.rightLeg.rotation.set(0, 0, 0.08);
+        this.parts.leftLeg.position.y = 0.5;
+        this.parts.rightLeg.position.y = 0.5;
+
+        // Comfy relaxed floppy arms
+        this.parts.leftArm.rotation.set(0, 0, -0.32 + idleBreath);
+        if (!this.isSlashing) {
+          this.parts.rightArm.rotation.set(0, 0, 0.32 - idleBreath);
+        }
       }
     } else {
-      // Idle breathing pose
-      this.walkTime = 0;
-      this.parts.leftLeg.rotation.x = 0;
-      this.parts.rightLeg.rotation.x = 0;
-      this.parts.leftArm.rotation.x = 0;
-      if (!this.isSlashing) {
-        this.parts.rightArm.rotation.x = 0;
+      // ---- WOBBLY JUMP / IN-AIR FLUTTER PHYSICS ----
+      this.inAirTime += delta;
+      const airFlutter = Math.sin(this.wobbleTime * 15.0) * 0.14;
+
+      if (vertSpeed > 1.2) {
+        // RISING UP: Arms shoot overhead in panic, legs trail/tuck!
+        this.parts.leftArm.rotation.x = -2.15 + airFlutter;
+        this.parts.leftArm.rotation.z = -0.68;
+        this.parts.leftArm.rotation.y = 0.15;
+
+        if (!this.isSlashing) {
+          this.parts.rightArm.rotation.x = -2.15 + airFlutter;
+          this.parts.rightArm.rotation.z = 0.68;
+          this.parts.rightArm.rotation.y = -0.15;
+        }
+
+        // Tucked / dangling legs
+        this.parts.leftLeg.rotation.x = 0.42 + Math.sin(this.wobbleTime * 7.0) * 0.18;
+        this.parts.rightLeg.rotation.x = -0.25 - Math.sin(this.wobbleTime * 7.0) * 0.18;
+        this.parts.leftLeg.rotation.z = -0.22;
+        this.parts.rightLeg.rotation.z = 0.22;
+
+        this.parts.torso.rotation.x = -0.16 + this.accelPitch;
+        this.parts.torso.rotation.z = this.turnLean * 1.4;
+      } else {
+        // FALLING DOWN: Airplane wing flailing, comedic bicycle flutter kicks!
+        this.parts.leftArm.rotation.x = -0.75 + airFlutter;
+        this.parts.leftArm.rotation.z = -1.15 - airFlutter;
+        this.parts.leftArm.rotation.y = 0.3;
+
+        if (!this.isSlashing) {
+          this.parts.rightArm.rotation.x = -0.75 + airFlutter;
+          this.parts.rightArm.rotation.z = 1.15 + airFlutter;
+          this.parts.rightArm.rotation.y = -0.3;
+        }
+
+        // Mid-air bicycle kick flutter
+        const kickCycle = Math.sin(this.wobbleTime * 13.0) * 0.55;
+        this.parts.leftLeg.rotation.x = kickCycle;
+        this.parts.rightLeg.rotation.x = -kickCycle;
+        this.parts.leftLeg.rotation.z = -0.28;
+        this.parts.rightLeg.rotation.z = 0.28;
+
+        this.parts.torso.rotation.x = 0.22 + this.accelPitch;
+        this.parts.torso.rotation.z = this.turnLean * 1.5;
       }
     }
 
-    // Slash animation
+    // 4. BOBBLEHEAD SECONDARY SPRING PHYSICS (HEAD & HAT)
+    const headSpring = 95.0;
+    const headDamp = 9.5;
+    const targetHeadX = -this.parts.torso.rotation.x * 0.65;
+    const targetHeadZ = -this.parts.torso.rotation.z * 0.75;
+
+    this.headBobbleVel.x += (-headSpring * (this.headBobble.x - targetHeadX) - headDamp * this.headBobbleVel.x) * delta;
+    this.headBobbleVel.z += (-headSpring * (this.headBobble.z - targetHeadZ) - headDamp * this.headBobbleVel.z) * delta;
+    this.headBobble.x += this.headBobbleVel.x * delta;
+    this.headBobble.z += this.headBobbleVel.z * delta;
+
+    this.parts.head.rotation.x = this.headBobble.x;
+    this.parts.head.rotation.z = this.headBobble.z;
+    // Compress head onto neck during squash
+    this.parts.head.position.y = 1.82 - (1.0 - this.squashStretch) * 0.25;
+
+    // 5. ATTACK / SLASH OVERRIDE
     if (this.isSlashing) {
-      this.slashProgress += delta * 6.5;
+      this.slashProgress += delta * 7.5;
       if (this.slashProgress < 1.0) {
-        const slashAngle = Math.sin(this.slashProgress * Math.PI) * 1.5;
+        const slashAngle = Math.sin(this.slashProgress * Math.PI) * 1.6;
         this.parts.rightArm.rotation.x = -slashAngle;
         this.parts.rightArm.rotation.z = -slashAngle * 0.4;
       } else {
         this.isSlashing = false;
         this.slashProgress = 0;
-        this.parts.rightArm.rotation.x = 0;
-        this.parts.rightArm.rotation.z = 0;
       }
     }
   }
@@ -601,6 +851,16 @@ export class CharacterAvatar {
   public resetFromRagdoll() {
     this.isRagdoll = false;
     this.ragdollVelocities = [];
+
+    // Reset wobbly jelly scale and physics state
+    this.squashStretch = 1.0;
+    this.squashStretchVel = 0;
+    this.targetSquash = 1.0;
+    this.parts.root.scale.set(1, 1, 1);
+    this.turnLean = 0;
+    this.accelPitch = 0;
+    this.headBobble.set(0, 0, 0);
+    this.headBobbleVel.set(0, 0, 0);
 
     // Reset local piece positions and rotations
     this.parts.torso.position.set(0, 1.0, 0);

@@ -422,10 +422,11 @@ export class RocraftGameEngine {
 
   private updateCamera(delta: number) {
     if (this.isFirstPerson) {
-      // 1st Person: Camera directly at player eye level
+      // 1st Person: Camera at player eye level, tracking jelly squash & stretch
+      const eyeHeight = 1.62 * (0.5 + 0.5 * this.avatar.squashStretch);
       this.camera.position.set(
         this.physics.playerPos.x,
-        this.physics.playerPos.y + 1.62,
+        this.physics.playerPos.y + eyeHeight,
         this.physics.playerPos.z
       );
 
@@ -439,9 +440,9 @@ export class RocraftGameEngine {
       // Keep avatar rotated in look direction for physics consistency
       this.avatar.group.rotation.y = this.cameraYaw + Math.PI;
 
-      // Update 1st person viewmodel bobbing & swinging
+      // Update 1st person viewmodel bobbing, sway & swinging
       const isMoving = Math.abs(this.physics.playerVel.x) > 0.3 || Math.abs(this.physics.playerVel.z) > 0.3;
-      this.firstPersonViewmodel.update(delta, isMoving, this.physics.isGrounded);
+      this.firstPersonViewmodel.update(delta, isMoving, this.physics.isGrounded, this.physics.playerVel);
     } else {
       // 3rd Person: Orbit over player's shoulder (classic Roblox camera)
       const targetPos = new THREE.Vector3(

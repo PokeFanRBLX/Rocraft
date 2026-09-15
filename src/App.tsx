@@ -7,19 +7,21 @@ import { InventoryModal } from './components/InventoryModal';
 import { ControlsModal } from './components/ControlsModal';
 import { VictoryModal } from './components/VictoryModal';
 import { MusicPlayerModal } from './components/MusicPlayerModal';
+import { OwnerPanelModal } from './components/OwnerPanelModal';
 import { AvatarConfig, HotbarSlot, WorldPreset, BlockId } from './types';
 import { soundEngine } from './utils/audio';
+import { isOwnerName } from './utils/ranks';
 
 const DEFAULT_AVATAR: AvatarConfig = {
-  name: 'BloxMiner',
+  name: 'PokeFan_',
   headColor: '#facc15',
   torsoColor: '#0284c7',
   leftArmColor: '#facc15',
   rightArmColor: '#facc15',
   leftLegColor: '#16a34a',
   rightLegColor: '#16a34a',
-  face: 'classic_smile',
-  hat: 'top_hat'
+  face: 'chill',
+  hat: 'crown'
 };
 
 const DEFAULT_HOTBAR: HotbarSlot[] = [
@@ -74,7 +76,11 @@ export default function App() {
   const [isControlsModalOpen, setIsControlsModalOpen] = useState<boolean>(false);
   const [isVictoryModalOpen, setIsVictoryModalOpen] = useState<boolean>(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState<boolean>(false);
+  const [isOwnerPanelOpen, setIsOwnerPanelOpen] = useState<boolean>(false);
+  const [activeAnnouncement, setActiveAnnouncement] = useState<string | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(soundEngine.isMusicActive());
+
+  const isOwner = isOwnerName(avatarConfig.name);
 
   // Subscribe to music state changes
   useEffect(() => {
@@ -169,13 +175,38 @@ export default function App() {
   // Global keybinds
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // '#' Key toggle for Owner Control Panel (works even if other modals are closed)
+      if (e.key === '#' || (e.shiftKey && e.code === 'Digit3')) {
+        // Prevent typing into gameplay
+        if (isOwnerName(avatarConfig.name)) {
+          e.preventDefault();
+          setIsOwnerPanelOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              soundEngine.playOwnerFanfare();
+              if (document.pointerLockElement) {
+                document.exitPointerLock();
+              }
+            }
+            return next;
+          });
+          return;
+        } else {
+          setCheckpointMessage('🔒 ACCESS DENIED: Owner Rank Required (Name must be "PokeFan_")');
+          setTimeout(() => setCheckpointMessage(null), 3000);
+          soundEngine.playOof();
+          return;
+        }
+      }
+
       if (
         isAvatarModalOpen ||
         isWorldModalOpen ||
         isInventoryModalOpen ||
         isControlsModalOpen ||
         isVictoryModalOpen ||
-        isMusicModalOpen
+        isMusicModalOpen ||
+        isOwnerPanelOpen
       ) {
         if (e.key === 'Escape') {
           setIsAvatarModalOpen(false);
@@ -184,6 +215,7 @@ export default function App() {
           setIsControlsModalOpen(false);
           setIsVictoryModalOpen(false);
           setIsMusicModalOpen(false);
+          setIsOwnerPanelOpen(false);
         }
         return;
       }
@@ -222,7 +254,9 @@ export default function App() {
     isInventoryModalOpen,
     isControlsModalOpen,
     isVictoryModalOpen,
-    isMusicModalOpen
+    isMusicModalOpen,
+    isOwnerPanelOpen,
+    avatarConfig.name
   ]);
 
   // Actions
@@ -385,6 +419,30 @@ export default function App() {
         onMobileJump={handleMobileJump}
         onMobileAttack={handleMobileAttack}
         onMobilePlace={handleMobilePlace}
+        isOwner={isOwner}
+        playerName={avatarConfig.name}
+        activeAnnouncement={activeAnnouncement}
+        onOpenOwnerPanel={() => {
+          setIsOwnerPanelOpen(true);
+          soundEngine.playOwnerFanfare();
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        }}
+      />
+
+      {/* Owner Control Panel Modal (Opened by # or topbar button) */}
+      <OwnerPanelModal
+        isOpen={isOwnerPanelOpen}
+        onClose={() => setIsOwnerPanelOpen(false)}
+        physics={engineRef.current?.physics ?? null}
+        gameEngine={engineRef.current}
+        avatarConfig={avatarConfig}
+        onUpdateAvatarConfig={handleSaveAvatar}
+        onBroadcastAnnouncement={(msg) => {
+          setActiveAnnouncement(msg);
+          setTimeout(() => setActiveAnnouncement(null), 8000);
+        }}
       />
 
       {/* Boombox & Soundtrack Modal */}

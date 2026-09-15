@@ -14,7 +14,8 @@ import {
   Flame,
   CheckCircle2,
   Music,
-  Radio
+  Radio,
+  Crown
 } from 'lucide-react';
 import { HotbarSlot, ToolDef, BlockDef } from '../types';
 import { TOOL_DEFINITIONS, BLOCK_DEFINITIONS } from '../engine/blocks';
@@ -48,6 +49,11 @@ interface HUDProps {
   onMobileJump?: () => void;
   onMobileAttack?: () => void;
   onMobilePlace?: () => void;
+  // Owner Rank & Announcement
+  isOwner?: boolean;
+  playerName?: string;
+  activeAnnouncement?: string | null;
+  onOpenOwnerPanel?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -77,7 +83,11 @@ export const HUD: React.FC<HUDProps> = ({
   onSelectSlot,
   onMobileJump,
   onMobileAttack,
-  onMobilePlace
+  onMobilePlace,
+  isOwner = false,
+  playerName = 'Player',
+  activeAnnouncement = null,
+  onOpenOwnerPanel
 }) => {
   const hpPercent = Math.max(0, Math.min(100, (health / maxHealth) * 100));
 
@@ -112,10 +122,32 @@ export const HUD: React.FC<HUDProps> = ({
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>Stage {currentStage}</span>
           </div>
+
+          {/* Rainbow OWNER Badge if user has owner name */}
+          {isOwner && (
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-black rainbow-badge shadow animate-in fade-in">
+              <Crown className="w-3.5 h-3.5 text-amber-300" />
+              <span className="rainbow-text font-black">OWNER</span>
+            </div>
+          )}
         </div>
 
         {/* Right: Quick Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Owner Panel Button (Glowing Rainbow) */}
+          {isOwner && (
+            <button
+              id="hud-btn-owner"
+              onClick={onOpenOwnerPanel}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer shadow-lg rainbow-badge rainbow-glow text-white hover:scale-105 active:scale-95"
+              title="Open Owner Control Panel (Press #)"
+            >
+              <Crown className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span className="rainbow-text hidden sm:inline">OWNER GUI (#)</span>
+              <span className="rainbow-text sm:hidden">#</span>
+            </button>
+          )}
+
           {/* Active status effect pills */}
           {activeEffects.lowGravity && (
             <div className="hidden md:flex items-center gap-1 bg-sky-500/20 border border-sky-400/50 px-2.5 py-1 rounded-lg text-xs font-bold text-sky-300 animate-pulse">
@@ -210,6 +242,19 @@ export const HUD: React.FC<HUDProps> = ({
           </button>
         </div>
       </header>
+
+      {/* ================= GLOBAL OWNER ANNOUNCEMENT ================= */}
+      {activeAnnouncement && (
+        <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-40 animate-in slide-in-from-top-3 duration-300">
+          <div className="bg-slate-950/95 border-2 border-transparent rainbow-border px-4 py-2.5 rounded-2xl shadow-2xl rainbow-glow flex items-center justify-center gap-2.5 text-center">
+            <Crown className="w-5 h-5 text-amber-300 animate-bounce shrink-0" />
+            <div className="text-xs sm:text-sm font-bold text-slate-100">
+              <span className="rainbow-text font-black mr-1">[OWNER ANNOUNCEMENT]:</span>
+              <span className="text-white drop-shadow">{activeAnnouncement}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= NOTIFICATIONS & OVERLAYS ================= */}
       {checkpointMessage && (

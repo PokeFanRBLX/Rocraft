@@ -24,3 +24,71 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* Rainbow Animated Effects for OWNER Rank */
+@keyframes rainbowFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.rainbow-text {
+  background: linear-gradient(
+    90deg,
+    #ff1a53,
+    #ff7700,
+    #ffea00,
+    #00ff66,
+    #00e5ff,
+    #7000ff,
+    #ff00b7,
+    #ff1a53
+  );
+  background-size: 300% 300%;
+  animation: rainbowFlow 3.5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.rainbow-badge {
+  position: relative;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+.rainbow-badge::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    90deg,
+    #ff1a53,
+    #ff7700,
+    #ffea00,
+    #00ff66,
+    #00e5ff,
+    #7000ff,
+    #ff00b7,
+    #ff1a53
+  );
+  background-size: 300% 300%;
+  animation: rainbowFlow 3.5s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.rainbow-glow {
+  box-shadow: 0 0 16px rgba(255, 0, 128, 0.45), 0 0 28px rgba(0, 229, 255, 0.35);
+}

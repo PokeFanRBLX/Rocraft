@@ -49,6 +49,15 @@ export class PhysicsEngine {
   public onVictory?: () => void;
   public onHealthChange?: (hp: number) => void;
 
+  // Owner Rank Powers
+  public isGodMode: boolean = false;
+  public isFlying: boolean = false;
+  public isNoclip: boolean = false;
+  public speedMultiplier: number = 1.0;
+  public jumpMultiplier: number = 1.0;
+  public rainbowAura: boolean = false;
+  public savedWaypoint: THREE.Vector3 | null = null;
+
   constructor(world: VoxelWorld, avatar: CharacterAvatar, scene: THREE.Scene) {
     this.world = world;
     this.avatar = avatar;
@@ -84,7 +93,7 @@ export class PhysicsEngine {
   }
 
   public killPlayer() {
-    if (this.isDead) return;
+    if (this.isDead || this.isGodMode) return;
     this.isDead = true;
     this.health = 0;
     this.deaths++;
@@ -112,13 +121,13 @@ export class PhysicsEngine {
       return;
     }
 
-    // 2. Modifiers from held tools
+    // 2. Modifiers from held tools & Owner Multipliers
     const hasGravityCoil = this.avatar.heldToolId === 'gravity_coil';
     const hasSpeedCoil = this.avatar.heldToolId === 'speed_coil';
 
-    const baseSpeed = hasSpeedCoil ? 13.5 : 6.2;
+    const baseSpeed = (hasSpeedCoil ? 13.5 : 6.2) * this.speedMultiplier;
     const gravity = hasGravityCoil ? 11.0 : 25.0;
-    const jumpStrength = hasGravityCoil ? 14.0 : 8.8;
+    const jumpStrength = (hasGravityCoil ? 14.0 : 8.8) * this.jumpMultiplier;
 
     // Emit speed coil trail particles
     if (hasSpeedCoil && (moveInput.forward !== 0 || moveInput.strafe !== 0)) {
@@ -133,63 +142,105 @@ export class PhysicsEngine {
       }
     }
 
-    // 3. Movement input mapped to camera angle
-    const moveVector = new THREE.Vector3();
-    if (moveInput.forward !== 0 || moveInput.strafe !== 0) {
-      // Forward vector projected on horizontal plane
-      const forwardVec = new THREE.Vector3(
-        -Math.sin(cameraYaw),
-        0,
-        -Math.cos(cameraYaw)
-      ).normalize();
+    // Rainbow Aura trailing particles for Owner
+    if (this.rainbowAura && Math.random() < 0.8) {
+      const rainbowColors = [0xff1a53, 0xff7700, 0xffea00, 0x00ff66, 0x00e5ff, 0x7000ff, 0xff00b7];
+      const c = rainbowColors[Math.floor(Math.random() * rainbowColors.length)];
+      this.spawnParticle(
+        this.playerPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.6, Math.random() * 1.5, (Math.random() - 0.5) * 0.6)),
+        new THREE.Vector3((Math.random() - 0.5) * 0.8, Math.random() * 0.9 + 0.3, (Math.random() - 0.5) * 0.8),
+        c,
+        0.13,
+        0.45
+      );
+    }
 
-      const rightVec = new THREE.Vector3(
-        Math.cos(cameraYaw),
-        0,
-        -Math.sin(cameraYaw)
-      ).normalize();
-
-      moveVector.addScaledVector(forwardVec, moveInput.forward);
-      moveVector.addScaledVector(rightVec, moveInput.strafe);
-      if (moveVector.lengthSq() > 0) {
-        moveVector.normalize();
+    if (this.isFlying) {
+      // Free 3D Flight
+      const flySpeed = 16.0 * this.speedMultiplier;
+      const flyDir = new THREE.Vector3();
+      if (moveInput.forward !== 0 || moveInput.strafe !== 0) {
+        flyDir.addScaledVector(cameraDirection, moveInput.forward);
+        const rightVec = new THREE.Vector3(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw)).normalize();
+        flyDir.addScaledVector(rightVec, moveInput.strafe);
+        if (flyDir.lengthSq() > 0) flyDir.normalize();
       }
-    }
 
-    // Check block under feet for surface friction (Ice vs regular)
-    const footBlock = this.world.getBlock(
-      Math.round(this.playerPos.x),
-      Math.round(this.playerPos.y - 0.2),
-      Math.round(this.playerPos.z)
-    );
-    const isIce = footBlock === 'ice';
-    const friction = isIce ? 0.96 : this.isGrounded ? 0.72 : 0.92;
+      this.playerVel.x = THREE.MathUtils.lerp(this.playerVel.x, flyDir.x * flySpeed, 0.22);
+      this.playerVel.z = THREE.MathUtils.lerp(this.playerVel.z, flyDir.z * flySpeed, 0.22);
 
-    if (moveVector.lengthSq() > 0) {
-      this.playerVel.x = THREE.MathUtils.lerp(this.playerVel.x, moveVector.x * baseSpeed, isIce ? 0.08 : 0.35);
-      this.playerVel.z = THREE.MathUtils.lerp(this.playerVel.z, moveVector.z * baseSpeed, isIce ? 0.08 : 0.35);
-      // Rotate avatar towards movement direction
-      const targetAngle = Math.atan2(moveVector.x, moveVector.z);
-      this.avatar.group.rotation.y = targetAngle;
-    } else {
-      this.playerVel.x *= friction;
-      this.playerVel.z *= friction;
-    }
-
-    // Jump handling
-    if (moveInput.jump && this.isGrounded) {
-      this.playerVel.y = jumpStrength;
+      let targetY = flyDir.y * flySpeed;
+      if (moveInput.jump) {
+        targetY = 12.0 * this.speedMultiplier;
+      }
+      this.playerVel.y = THREE.MathUtils.lerp(this.playerVel.y, targetY, 0.22);
       this.isGrounded = false;
-      if (hasGravityCoil) {
-        soundEngine.playGravityBoing();
-      } else {
-        soundEngine.playJump();
-      }
-    }
+    } else {
+      // 3. Grounded / Standard Movement input mapped to camera angle
+      const moveVector = new THREE.Vector3();
+      if (moveInput.forward !== 0 || moveInput.strafe !== 0) {
+        const forwardVec = new THREE.Vector3(
+          -Math.sin(cameraYaw),
+          0,
+          -Math.cos(cameraYaw)
+        ).normalize();
 
-    // Gravity
-    this.playerVel.y -= gravity * delta;
-    if (this.playerVel.y < -35) this.playerVel.y = -35; // Terminal velocity
+        const rightVec = new THREE.Vector3(
+          Math.cos(cameraYaw),
+          0,
+          -Math.sin(cameraYaw)
+        ).normalize();
+
+        moveVector.addScaledVector(forwardVec, moveInput.forward);
+        moveVector.addScaledVector(rightVec, moveInput.strafe);
+        if (moveVector.lengthSq() > 0) {
+          moveVector.normalize();
+        }
+      }
+
+      // Check block under feet for surface friction (Ice vs regular)
+      const footBlock = this.world.getBlock(
+        Math.round(this.playerPos.x),
+        Math.round(this.playerPos.y - 0.2),
+        Math.round(this.playerPos.z)
+      );
+      const isIce = footBlock === 'ice';
+      const friction = isIce ? 0.96 : this.isGrounded ? 0.72 : 0.92;
+
+      if (moveVector.lengthSq() > 0) {
+        // Elastic wobbly acceleration
+        const accelRate = isIce ? 0.08 : (this.isGrounded ? 0.32 : 0.18);
+        this.playerVel.x = THREE.MathUtils.lerp(this.playerVel.x, moveVector.x * baseSpeed, accelRate);
+        this.playerVel.z = THREE.MathUtils.lerp(this.playerVel.z, moveVector.z * baseSpeed, accelRate);
+
+        // Smooth wobbly turn towards movement direction
+        const targetAngle = Math.atan2(moveVector.x, moveVector.z);
+        let diff = targetAngle - this.avatar.group.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.avatar.group.rotation.y += diff * Math.min(1.0, delta * 14.0);
+      } else {
+        this.playerVel.x *= friction;
+        this.playerVel.z *= friction;
+      }
+
+      // Jump handling with wobbly stretch and launch puff
+      if (moveInput.jump && this.isGrounded) {
+        this.playerVel.y = jumpStrength;
+        this.isGrounded = false;
+        this.avatar.triggerWobblyJump(jumpStrength);
+        if (hasGravityCoil) {
+          soundEngine.playGravityBoing();
+        } else {
+          soundEngine.playWobbleJump();
+        }
+        this.spawnLandingParticles(this.playerPos, 6);
+      }
+
+      // Gravity
+      this.playerVel.y -= gravity * delta;
+      if (this.playerVel.y < -35) this.playerVel.y = -35; // Terminal velocity
+    }
 
     // 4. Voxel AABB Collision & Integration
     this.moveWithCollision(delta);
@@ -199,13 +250,20 @@ export class PhysicsEngine {
 
     // 6. Void Fall Check
     if (this.playerPos.y < -15) {
-      this.killPlayer();
+      if (this.isGodMode) {
+        this.playerPos.copy(this.lastCheckpoint);
+        this.playerPos.y += 1.5;
+        this.playerVel.set(0, 0, 0);
+        soundEngine.playGravityBoing();
+      } else {
+        this.killPlayer();
+      }
     }
 
     // 7. Update Avatar position & animation
     this.avatar.group.position.copy(this.playerPos);
     const isMoving = Math.abs(this.playerVel.x) > 0.3 || Math.abs(this.playerVel.z) > 0.3;
-    this.avatar.updateAnimation(delta, isMoving, this.isGrounded);
+    this.avatar.updateAnimation(delta, isMoving, this.isGrounded, this.playerVel, this.avatar.group.rotation.y);
 
     // 8. Update Projectiles & Particles & Dummies
     this.updateRockets(delta);
@@ -214,10 +272,16 @@ export class PhysicsEngine {
   }
 
   private moveWithCollision(delta: number) {
+    if (this.isNoclip) {
+      this.playerPos.addScaledVector(this.playerVel, delta);
+      return;
+    }
+
     const halfW = 0.3;
     const height = 1.8;
 
     // Movement step: Y axis first
+    const prevVelY = this.playerVel.y;
     const nextY = this.playerPos.y + this.playerVel.y * delta;
     let collidedY = false;
 
@@ -239,6 +303,14 @@ export class PhysicsEngine {
               this.playerVel.y = 0;
               this.isGrounded = true;
               collidedY = true;
+
+              // Wobbly Life landing squash reaction
+              if (prevVelY < -1.8) {
+                const impact = Math.min(Math.abs(prevVelY) / 10.0, 2.5);
+                this.avatar.triggerWobblyLanding(impact);
+                soundEngine.playWobbleLand(impact);
+                this.spawnLandingParticles(this.playerPos, Math.floor(5 + impact * 6));
+              }
               break;
             }
           }
@@ -381,7 +453,7 @@ export class PhysicsEngine {
           if (!def) continue;
 
           // Killbrick hazard check (any body contact)
-          if (def.isHazard) {
+          if (def.isHazard && !this.isGodMode) {
             this.killPlayer();
             return;
           }
@@ -564,10 +636,11 @@ export class PhysicsEngine {
           soundEngine.playSwordHit();
           this.spawnBlockParticles(dummyPos.x, dummyPos.y, dummyPos.z, 0xef4444, 8);
 
-          // Knockback
+          // Knockback & wobbly recoil
           d.dummy.position[0] += dirToDummy.x * 1.5;
           d.dummy.position[2] += dirToDummy.z * 1.5;
           d.avatar.group.position.set(d.dummy.position[0], d.dummy.position[1], d.dummy.position[2]);
+          d.avatar.triggerWobblyBump(dirToDummy.x, dirToDummy.z);
 
           this.checkDummyDeath(d);
         }
@@ -661,6 +734,24 @@ export class PhysicsEngine {
     }
   }
 
+  public spawnLandingParticles(pos: THREE.Vector3, count: number = 8) {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed = Math.random() * 2.2 + 0.8;
+      this.spawnParticle(
+        new THREE.Vector3(pos.x, pos.y + 0.05, pos.z),
+        new THREE.Vector3(
+          Math.cos(angle) * speed,
+          Math.random() * 1.5 + 0.5,
+          Math.sin(angle) * speed
+        ),
+        0xe2e8f0, // Soft cartoon dust puff
+        0.09,
+        0.35
+      );
+    }
+  }
+
   public spawnExplosion(pos: THREE.Vector3) {
     const geom = new THREE.SphereGeometry(0.2, 6, 6);
     const colors = [0xef4444, 0xf97316, 0xfacc15, 0x475569];
@@ -715,5 +806,95 @@ export class PhysicsEngine {
         this.particles.splice(i, 1);
       }
     }
+  }
+
+  // ================= OWNER RANK POWERS & ACTIONS ================= //
+
+  public teleportTo(x: number, y: number, z: number) {
+    this.playerPos.set(x, y, z);
+    this.playerVel.set(0, 0, 0);
+    this.avatar.group.position.copy(this.playerPos);
+
+    // Flashy arrival particles
+    this.spawnBlockParticles(x, y + 1.0, z, 0x00e5ff, 25);
+    this.spawnBlockParticles(x, y + 1.5, z, 0xff00b7, 25);
+    soundEngine.playGravityBoing();
+  }
+
+  public healFull() {
+    this.health = this.maxHealth;
+    if (this.onHealthChange) this.onHealthChange(this.health);
+    soundEngine.playHeal();
+    this.spawnBlockParticles(this.playerPos.x, this.playerPos.y + 1, this.playerPos.z, 0x22c55e, 20);
+  }
+
+  public setSuperHealth(hp: number = 10000) {
+    this.maxHealth = hp;
+    this.health = hp;
+    if (this.onHealthChange) this.onHealthChange(this.health);
+    soundEngine.playPowerup();
+    this.spawnBlockParticles(this.playerPos.x, this.playerPos.y + 1, this.playerPos.z, 0xfacc15, 30);
+  }
+
+  public saveWaypoint() {
+    this.savedWaypoint = this.playerPos.clone();
+    soundEngine.playCheckpoint();
+  }
+
+  public teleportToWaypoint(): boolean {
+    if (!this.savedWaypoint) return false;
+    this.teleportTo(this.savedWaypoint.x, this.savedWaypoint.y + 0.2, this.savedWaypoint.z);
+    return true;
+  }
+
+  public detonateAllTNT() {
+    const tntCoords: { x: number; y: number; z: number }[] = [];
+    this.world.blocks.forEach((val, key) => {
+      if (val === 'tnt') {
+        const [x, y, z] = key.split(',').map(Number);
+        tntCoords.push({ x, y, z });
+      }
+    });
+
+    tntCoords.forEach((coord, idx) => {
+      setTimeout(() => {
+        this.world.setBlock(coord.x, coord.y, coord.z, null);
+        this.spawnPrimedTNT(coord.x, coord.y, coord.z);
+      }, idx * 60);
+    });
+
+    return tntCoords.length;
+  }
+
+  public clearHazards(): number {
+    const hazardCoords: { x: number; y: number; z: number }[] = [];
+    this.world.blocks.forEach((val, key) => {
+      if (val === 'killbrick') {
+        const [x, y, z] = key.split(',').map(Number);
+        hazardCoords.push({ x, y, z });
+      }
+    });
+
+    hazardCoords.forEach((c) => {
+      this.world.setBlock(c.x, c.y, c.z, 'gold');
+      this.spawnBlockParticles(c.x, c.y + 0.5, c.z, 0xfacc15, 4);
+    });
+
+    if (hazardCoords.length > 0) {
+      soundEngine.playPowerup();
+    }
+    return hazardCoords.length;
+  }
+
+  public spawnDummiesAtPlayer(count: number = 3) {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const radius = 3.5;
+      const dx = this.playerPos.x + Math.cos(angle) * radius;
+      const dz = this.playerPos.z + Math.sin(angle) * radius;
+      this.spawnDummy(Math.round(dx), Math.round(this.playerPos.y), Math.round(dz));
+      this.spawnBlockParticles(dx, this.playerPos.y + 1, dz, 0x38bdf8, 12);
+    }
+    soundEngine.playPowerup();
   }
 }

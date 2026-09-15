@@ -85,6 +85,23 @@ export const ControlsModal: React.FC<ControlsModalProps> = ({ isOpen, onClose })
               <li>🟦 <strong className="text-cyan-300">Trampolines:</strong> Step on them to super bounce into the sky!</li>
             </ul>
           </div>
+
+          {/* Owner Rank Privileges */}
+          <div>
+            <h3 className="font-bold text-slate-200 mb-2 flex items-center gap-2">
+              <span className="text-amber-400">👑</span>
+              <span className="rainbow-text">Owner Rank & Privileges</span>
+            </h3>
+            <div className="text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-pink-500/30 space-y-1.5">
+              <p>
+                If your player name starts with <strong className="text-amber-300 font-mono">PokeFan_</strong>, you are automatically recognized as the <strong className="rainbow-text">OWNER</strong> with rainbow animated overhead nametags!
+              </p>
+              <div className="flex items-center gap-2 pt-1 text-slate-300">
+                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-amber-300 font-mono font-bold">#</kbd>
+                <span>Toggle the Owner Control Panel GUI (God Mode, Flight, Noclip, Teleports, TNT & Broadcast)</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

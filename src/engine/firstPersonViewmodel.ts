@@ -208,7 +208,7 @@ export class FirstPersonViewmodel {
     this.swingProgress = 1.0;
   }
 
-  public update(delta: number, isMoving: boolean, isGrounded: boolean) {
+  public update(delta: number, isMoving: boolean, isGrounded: boolean, velocity?: THREE.Vector3) {
     // 1. Swing Animation
     if (this.swingProgress > 0) {
       this.swingProgress = Math.max(0, this.swingProgress - delta * 6.5);
@@ -223,18 +223,36 @@ export class FirstPersonViewmodel {
       this.armGroup.position.set(0, 0, 0);
     }
 
-    // 2. Walking Bobbing
+    // 2. Wobbly Bobbing & Air Inertia
     if (isMoving && isGrounded) {
-      this.walkTimer += delta * 9.5;
-      const bobY = Math.sin(this.walkTimer) * 0.016;
-      const bobX = Math.cos(this.walkTimer * 0.5) * 0.012;
+      const speedMultiplier = velocity ? (9.5 + Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z) * 0.5) : 9.5;
+      this.walkTimer += delta * speedMultiplier;
+      // Figure-8 wobbly sway
+      const bobY = Math.abs(Math.sin(this.walkTimer)) * 0.024 - 0.012;
+      const bobX = Math.sin(this.walkTimer * 0.5) * 0.02;
+      const tiltZ = Math.sin(this.walkTimer * 0.5) * 0.05;
+      const tiltX = Math.cos(this.walkTimer) * 0.03;
+
       this.group.position.set(
         this.basePos.x + bobX,
         this.basePos.y + bobY,
         this.basePos.z
       );
+      this.group.rotation.set(tiltX, 0, tiltZ);
+    } else if (!isGrounded) {
+      // In-air wobbly drift
+      const vy = velocity ? velocity.y : 0;
+      const targetY = vy > 0 ? this.basePos.y - 0.025 : this.basePos.y + 0.015;
+      this.group.position.y = THREE.MathUtils.lerp(this.group.position.y, targetY, 0.1);
+      this.group.position.x = THREE.MathUtils.lerp(this.group.position.x, this.basePos.x, 0.1);
+      this.group.position.z = THREE.MathUtils.lerp(this.group.position.z, this.basePos.z, 0.1);
+      this.group.rotation.x = THREE.MathUtils.lerp(this.group.rotation.x, THREE.MathUtils.clamp(vy * -0.02, -0.2, 0.2), 0.1);
     } else {
-      this.group.position.lerp(this.basePos, 0.15);
+      // Idle breathing
+      this.walkTimer += delta * 2.5;
+      const breathY = Math.sin(this.walkTimer) * 0.004;
+      this.group.position.set(this.basePos.x, this.basePos.y + breathY, this.basePos.z);
+      this.group.rotation.set(0, 0, 0);
     }
   }
 }
