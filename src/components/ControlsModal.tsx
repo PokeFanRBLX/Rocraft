@@ -41,6 +41,8 @@ export const ControlsModal: React.FC<ControlsModalProps> = ({ isOpen, onClose })
               <div className="text-slate-400">Walk & Strafe</div>
               <div><strong className="text-amber-300 font-mono">Space</strong></div>
               <div className="text-slate-400">Jump</div>
+              <div><strong className="text-amber-300 font-mono">]</strong> or <strong className="text-amber-300 font-mono">/</strong></div>
+              <div className="text-slate-400">Open / Close Multiplayer Chat</div>
               <div><strong className="text-amber-300 font-mono">V</strong> or <strong className="text-amber-300 font-mono">F5</strong></div>
               <div className="text-slate-400">Toggle 1st / 3rd Person</div>
               <div><strong className="text-amber-300 font-mono">R</strong></div>
@@ -65,6 +67,10 @@ export const ControlsModal: React.FC<ControlsModalProps> = ({ isOpen, onClose })
               <div className="text-slate-400">Select Hotbar Slot</div>
               <div><strong className="text-sky-300 font-mono">B</strong></div>
               <div className="text-slate-400">Open Boombox & Soundtrack Player</div>
+              <div><strong className="text-sky-300 font-mono">G</strong></div>
+              <div className="text-slate-400">Daily Login Rewards & Streak Gifts</div>
+              <div><strong className="text-sky-300 font-mono">F</strong></div>
+              <div className="text-slate-400">Friends & Multiplayer Lobbies</div>
               <div><strong className="text-sky-300 font-mono">E</strong></div>
               <div className="text-slate-400">Open Full Block/Gear Catalog</div>
             </div>

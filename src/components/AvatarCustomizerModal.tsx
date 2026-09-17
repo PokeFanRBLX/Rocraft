@@ -1,14 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { X, Check, Sparkles, User, Wand2 } from 'lucide-react';
+import { X, Check, Sparkles, User, Wand2, Lock, Gift, Coins } from 'lucide-react';
 import { AvatarConfig, FaceType, HatType } from '../types';
 import { CharacterAvatar } from '../engine/avatar';
+import {
+  loadDailyRewardState,
+  purchaseHatWithCoins,
+  purchaseHatWithTix,
+  EXCLUSIVE_HATS_INFO
+} from '../utils/dailyRewardStorage';
+import { soundEngine } from '../utils/audio';
 
 interface AvatarCustomizerModalProps {
   isOpen: boolean;
   currentConfig: AvatarConfig;
   onClose: () => void;
   onSave: (config: AvatarConfig) => void;
+  onOpenDailyRewards?: () => void;
+  onCoinsChanged?: (newBalance: number) => void;
+  onTixChanged?: (newTixBalance: number) => void;
 }
 
 const ROBLOX_COLOR_PALETTE = [
@@ -32,25 +42,35 @@ const FACES: { id: FaceType; name: string; icon: string }[] = [
   { id: 'surprised', name: 'Surprised :O', icon: '😮' }
 ];
 
-const HATS: { id: HatType; name: string; icon: string }[] = [
+const HATS: { id: HatType; name: string; icon: string; isExclusive?: boolean; dayRequirement?: number }[] = [
   { id: 'none', name: 'No Hat', icon: '🚫' },
   { id: 'top_hat', name: 'Blox Top Hat', icon: '🎩' },
   { id: 'builder_helmet', name: 'Builder Hardhat', icon: '👷' },
   { id: 'crown', name: 'Royal Crown', icon: '👑' },
   { id: 'viking', name: 'Viking Horns', icon: '⚔️' },
   { id: 'valkyrie', name: 'Valkyrie Helm', icon: '🛡️' },
-  { id: 'cap', name: 'Red Cap', icon: '🧢' }
+  { id: 'cap', name: 'Red Cap', icon: '🧢' },
+  { id: 'dino_hood', name: 'Chomper Dino', icon: '🦖', isExclusive: true, dayRequirement: 2 },
+  { id: 'cyber_visor', name: 'Cyber Visor', icon: '👓', isExclusive: true, dayRequirement: 4 },
+  { id: 'wizard_hat', name: 'Mystic Wizard', icon: '🧙‍♂️', isExclusive: true, dayRequirement: 6 },
+  { id: 'dominus', name: 'Dominus Aureus', icon: '👑', isExclusive: true, dayRequirement: 7 },
+  { id: 'halo', name: 'Golden Halo', icon: '😇', isExclusive: true, dayRequirement: 7 }
 ];
 
 export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({
   isOpen,
   currentConfig,
   onClose,
-  onSave
+  onSave,
+  onOpenDailyRewards,
+  onCoinsChanged,
+  onTixChanged
 }) => {
   const [draft, setDraft] = useState<AvatarConfig>({ ...currentConfig });
   const [activeTab, setActiveTab] = useState<'colors' | 'face' | 'hats'>('colors');
   const [selectedBodyPart, setSelectedBodyPart] = useState<'head' | 'torso' | 'arms' | 'legs'>('torso');
+  const [rewardState, setRewardState] = useState(loadDailyRewardState());
+  const [shopNotice, setShopNotice] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewAvatarRef = useRef<CharacterAvatar | null>(null);
@@ -58,6 +78,8 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setDraft({ ...currentConfig });
+      setRewardState(loadDailyRewardState());
+      setShopNotice(null);
     }
   }, [isOpen, currentConfig]);
 
@@ -165,12 +187,40 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({
               Avatar Customizer
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* TIX Balance */}
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-rose-500/15 border border-rose-500/40 rounded-xl text-xs font-black text-rose-300">
+              <span>🎟️</span>
+              <span className="font-mono">{(rewardState.tix || 0).toLocaleString()}</span>
+              <span className="text-[10px] text-rose-400 uppercase font-extrabold hidden sm:inline">TIX</span>
+            </div>
+
+            {/* Coin Balance */}
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs font-bold text-amber-300">
+              <span>🪙</span>
+              <span className="font-mono">{rewardState.coins.toLocaleString()}</span>
+            </div>
+
+            {/* Daily Rewards shortcut */}
+            {onOpenDailyRewards && (
+              <button
+                onClick={onOpenDailyRewards}
+                className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+                title="Open Daily Rewards & Streaks"
+              >
+                <Gift className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Daily Rewards</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -334,24 +384,149 @@ export const AvatarCustomizerModal: React.FC<AvatarCustomizerModalProps> = ({
             {/* TAB 3: Hat Selector */}
             {activeTab === 'hats' && (
               <div className="space-y-3 flex-1">
-                <label className="text-xs font-bold text-slate-300 block">
-                  Equip Hat / Accessory:
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {HATS.map((h) => (
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 block">
+                    Equip Hat / Accessory:
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    Unlock exclusive hats via <strong>Daily Login Rewards</strong>
+                  </span>
+                </div>
+
+                {shopNotice && (
+                  <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center justify-between gap-2">
+                    <span>{shopNotice}</span>
                     <button
-                      key={h.id}
-                      onClick={() => setDraft({ ...draft, hat: h.id })}
-                      className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${
-                        draft.hat === h.id
-                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow'
-                          : 'bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800'
-                      }`}
+                      onClick={() => setShopNotice(null)}
+                      className="text-slate-400 hover:text-white"
                     >
-                      <span className="text-2xl">{h.icon}</span>
-                      <span className="text-xs font-bold">{h.name}</span>
+                      ✕
                     </button>
-                  ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
+                  {HATS.map((h) => {
+                    const isUnlocked = rewardState.unlockedHats.includes(h.id);
+                    const isEquipped = draft.hat === h.id;
+                    const info = EXCLUSIVE_HATS_INFO[h.id];
+
+                    return (
+                      <div
+                        key={h.id}
+                        className={`relative flex flex-col p-2.5 rounded-xl border transition ${
+                          isEquipped
+                            ? 'bg-amber-500/20 border-amber-400 shadow-md'
+                            : isUnlocked
+                            ? 'bg-slate-800/70 border-slate-700/80 hover:bg-slate-800'
+                            : 'bg-slate-950/60 border-slate-800 opacity-90'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1 mb-1">
+                          <span className="text-2xl">{h.icon}</span>
+
+                          {/* Exclusive badge or status */}
+                          {h.isExclusive && (
+                            <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {info?.rarity || 'Exclusive'}
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-xs font-bold text-slate-200 truncate">
+                          {h.name}
+                        </span>
+
+                        {/* Action buttons */}
+                        <div className="mt-2 pt-1.5 border-t border-slate-700/50 flex items-center justify-between gap-1">
+                          {isUnlocked ? (
+                            <button
+                              onClick={() => {
+                                setDraft({ ...draft, hat: h.id });
+                                soundEngine.playCollectCoin();
+                              }}
+                              className={`w-full py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                                isEquipped
+                                  ? 'bg-amber-500 text-slate-950 font-black'
+                                  : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                              }`}
+                            >
+                              {isEquipped ? '✓ Equipped' : 'Wear'}
+                            </button>
+                          ) : (
+                            <div className="w-full flex flex-col gap-1">
+                              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span className="flex items-center gap-1">
+                                  <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                  <span>Day {h.dayRequirement} Streak</span>
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col gap-1 mt-0.5">
+                                {info?.coinPrice && (
+                                  <button
+                                    onClick={() => {
+                                      if (info.coinPrice) {
+                                        const res = purchaseHatWithCoins(h.id, info.coinPrice);
+                                        if (res.success) {
+                                          setRewardState(res.updatedState);
+                                          setDraft({ ...draft, hat: h.id });
+                                          soundEngine.playDailyClaim();
+                                          setShopNotice(res.message);
+                                          if (onCoinsChanged) onCoinsChanged(res.updatedState.coins);
+                                        } else {
+                                          soundEngine.playOof();
+                                          setShopNotice(res.message);
+                                        }
+                                      }
+                                    }}
+                                    disabled={rewardState.coins < info.coinPrice}
+                                    className={`w-full py-1 px-1.5 rounded-lg text-[10px] font-bold flex items-center justify-between transition ${
+                                      rewardState.coins >= info.coinPrice
+                                        ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer'
+                                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <span>🪙 {info.coinPrice}</span>
+                                    <span className="text-[9px] uppercase font-black">Buy</span>
+                                  </button>
+                                )}
+
+                                {info?.tixPrice && (
+                                  <button
+                                    onClick={() => {
+                                      if (info.tixPrice) {
+                                        const res = purchaseHatWithTix(h.id, info.tixPrice);
+                                        if (res.success) {
+                                          setRewardState(res.updatedState);
+                                          setDraft({ ...draft, hat: h.id });
+                                          soundEngine.playDailyClaim();
+                                          setShopNotice(res.message);
+                                          if (onTixChanged) onTixChanged(res.updatedState.tix);
+                                        } else {
+                                          soundEngine.playOof();
+                                          setShopNotice(res.message);
+                                        }
+                                      }
+                                    }}
+                                    disabled={(rewardState.tix || 0) < info.tixPrice}
+                                    className={`w-full py-1 px-1.5 rounded-lg text-[10px] font-bold flex items-center justify-between transition ${
+                                      (rewardState.tix || 0) >= info.tixPrice
+                                        ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer'
+                                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <span>🎟️ {info.tixPrice} TIX</span>
+                                    <span className="text-[9px] uppercase font-black">Buy</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

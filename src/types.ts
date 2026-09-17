@@ -18,7 +18,14 @@ export type BlockId =
   | 'checkpoint'
   | 'fadeblock'
   | 'ice'
-  | 'trophy';
+  | 'trophy'
+  | 'flower'
+  | 'pumpkin'
+  | 'melon'
+  | 'water'
+  | 'carpet'
+  | 'wallpaper'
+  | 'doorblock';
 
 export interface BlockDef {
   id: BlockId;
@@ -65,7 +72,43 @@ export interface HotbarSlot {
 }
 
 export type FaceType = 'classic_smile' | 'chill' | 'epic' | 'xd' | 'surprised';
-export type HatType = 'none' | 'top_hat' | 'builder_helmet' | 'crown' | 'viking' | 'valkyrie' | 'cap';
+export type HatType =
+  | 'none'
+  | 'top_hat'
+  | 'builder_helmet'
+  | 'crown'
+  | 'viking'
+  | 'valkyrie'
+  | 'cap'
+  | 'dino_hood'
+  | 'cyber_visor'
+  | 'wizard_hat'
+  | 'dominus'
+  | 'halo';
+
+export interface DailyRewardTier {
+  day: number;
+  coins: number;
+  tix: number; // Tickets currency earned each day
+  hatReward?: HatType;
+  hatName?: string;
+  hatDescription?: string;
+  title: string;
+  badge: 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
+  perkDescription?: string;
+}
+
+export interface DailyRewardState {
+  lastLoginDate: string; // YYYY-MM-DD
+  lastClaimDate: string; // YYYY-MM-DD
+  currentStreak: number; // 1 to 7
+  totalLogins: number;
+  coins: number;
+  tix: number; // Classic Tickets currency balance
+  unlockedHats: HatType[];
+  claimedCycleDays: number[]; // Day numbers claimed in current 7-day cycle e.g. [1, 2]
+  streakCycle: number; // How many cycles completed
+}
 
 export interface AvatarConfig {
   name: string;
@@ -79,7 +122,7 @@ export interface AvatarConfig {
   hat: HatType;
 }
 
-export type WorldPreset = 'obby' | 'survival' | 'arena' | 'flat';
+export type WorldPreset = 'obby' | 'survival' | 'arena' | 'flat' | 'garden' | 'doors';
 
 export interface WorldData {
   version: number;
@@ -112,4 +155,50 @@ export interface TargetDummy {
   maxHealth: number;
   name: string;
   isHit: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  text: string;
+  timestamp: string;
+  isOwner?: boolean;
+  isSystem?: boolean;
+  badge?: string;
+  channel?: 'all' | 'system' | 'players';
+}
+
+export interface LobbyInfo {
+  id: string;
+  name: string;
+  preset: WorldPreset;
+  playersCount: number;
+  maxPlayers: number;
+  pingMs: number;
+  region: string;
+  hostName?: string;
+  isPrivate?: boolean;
+  friendsInside?: string[];
+}
+
+export interface Friend {
+  id: string;
+  name: string;
+  avatarColors: {
+    head: string;
+    torso: string;
+  };
+  badge?: string;
+  status: 'in_lobby' | 'online' | 'offline';
+  currentLobby?: LobbyInfo;
+  lastSeen?: string;
+  isFavorite?: boolean;
+}
+
+export interface FriendRequest {
+  id: string;
+  fromName: string;
+  timestamp: string;
+  avatarHeadColor: string;
+  mutualFriends?: number;
 }

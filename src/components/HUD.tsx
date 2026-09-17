@@ -15,7 +15,11 @@ import {
   CheckCircle2,
   Music,
   Radio,
-  Crown
+  Crown,
+  MessageSquare,
+  Users,
+  Gift,
+  Coins
 } from 'lucide-react';
 import { HotbarSlot, ToolDef, BlockDef } from '../types';
 import { TOOL_DEFINITIONS, BLOCK_DEFINITIONS } from '../engine/blocks';
@@ -45,6 +49,16 @@ interface HUDProps {
   onOpenInventoryModal: () => void;
   onOpenControlsModal: () => void;
   onSelectSlot: (index: number) => void;
+  // Friends & Lobbies
+  onOpenFriendsModal?: () => void;
+  onlineFriendsCount?: number;
+  currentLobbyName?: string;
+  // Daily Rewards & Currency
+  coins?: number;
+  tix?: number;
+  onOpenDailyRewardModal?: () => void;
+  canClaimDailyReward?: boolean;
+  currentStreak?: number;
   // Mobile touch buttons
   onMobileJump?: () => void;
   onMobileAttack?: () => void;
@@ -54,6 +68,9 @@ interface HUDProps {
   playerName?: string;
   activeAnnouncement?: string | null;
   onOpenOwnerPanel?: () => void;
+  // Chat
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -81,13 +98,23 @@ export const HUD: React.FC<HUDProps> = ({
   onOpenInventoryModal,
   onOpenControlsModal,
   onSelectSlot,
+  onOpenFriendsModal,
+  onlineFriendsCount,
+  currentLobbyName,
+  coins = 350,
+  tix = 50,
+  onOpenDailyRewardModal,
+  canClaimDailyReward = false,
+  currentStreak = 1,
   onMobileJump,
   onMobileAttack,
   onMobilePlace,
   isOwner = false,
   playerName = 'Player',
   activeAnnouncement = null,
-  onOpenOwnerPanel
+  onOpenOwnerPanel,
+  isChatOpen = false,
+  onToggleChat
 }) => {
   const hpPercent = Math.max(0, Math.min(100, (health / maxHealth) * 100));
 
@@ -110,9 +137,16 @@ export const HUD: React.FC<HUDProps> = ({
 
           <div className="flex items-center gap-2">
             <Compass className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs sm:text-sm font-semibold text-slate-200 max-w-[110px] sm:max-w-[180px] truncate">
-              {worldName}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-semibold text-slate-200 max-w-[110px] sm:max-w-[180px] truncate leading-tight">
+                {worldName}
+              </span>
+              {currentLobbyName && (
+                <span className="text-[10px] text-emerald-400 font-medium truncate max-w-[120px] sm:max-w-[170px] hidden sm:block leading-tight">
+                  {currentLobbyName}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="h-4 w-px bg-slate-700" />
@@ -122,6 +156,29 @@ export const HUD: React.FC<HUDProps> = ({
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>Stage {currentStage}</span>
           </div>
+
+          {/* Blox Coins balance badge */}
+          <button
+            id="hud-btn-coins"
+            onClick={onOpenDailyRewardModal}
+            className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 px-2 py-0.5 rounded-lg text-xs font-bold text-amber-300 shadow transition cursor-pointer"
+            title="Blox Coins Balance (Click for Daily Rewards)"
+          >
+            <span>🪙</span>
+            <span className="font-mono">{coins.toLocaleString()}</span>
+          </button>
+
+          {/* TIX (Tickets) balance badge */}
+          <button
+            id="hud-btn-tix"
+            onClick={onOpenDailyRewardModal}
+            className="flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 hover:border-rose-400 px-2 py-0.5 rounded-lg text-xs font-black text-rose-300 shadow transition cursor-pointer"
+            title="TIX (Tickets) Balance - Earned Daily (Click for Rewards)"
+          >
+            <span>🎟️</span>
+            <span className="font-mono">{tix.toLocaleString()}</span>
+            <span className="text-[10px] text-rose-400 font-extrabold hidden sm:inline">TIX</span>
+          </button>
 
           {/* Rainbow OWNER Badge if user has owner name */}
           {isOwner && (
@@ -162,6 +219,55 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
           )}
 
+          {/* Daily Login Rewards button */}
+          {onOpenDailyRewardModal && (
+            <button
+              id="hud-btn-daily-rewards"
+              onClick={onOpenDailyRewardModal}
+              className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow border ${
+                canClaimDailyReward
+                  ? 'bg-gradient-to-r from-amber-500/25 to-orange-500/25 hover:from-amber-500/35 hover:to-orange-500/35 text-amber-200 border-amber-400 ring-2 ring-amber-500/40 animate-pulse'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-700'
+              }`}
+              title="Daily Login Rewards & Streaks (G)"
+            >
+              <Gift
+                className={`w-4 h-4 ${
+                  canClaimDailyReward ? 'text-amber-300 animate-bounce' : 'text-amber-400'
+                }`}
+              />
+              <span className="hidden md:inline">Rewards</span>
+              {canClaimDailyReward ? (
+                <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-full text-[9px] font-black uppercase shadow">
+                  GIFT!
+                </span>
+              ) : (
+                <span className="flex items-center gap-0.5 text-[10px] text-orange-400 font-bold">
+                  <Flame className="w-3 h-3 text-orange-400 fill-orange-400" />
+                  <span>{currentStreak}d</span>
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Friends & Lobbies button */}
+          {onOpenFriendsModal && (
+            <button
+              id="hud-btn-friends"
+              onClick={onOpenFriendsModal}
+              className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow"
+              title="Friends & Multiplayer Lobbies (F)"
+            >
+              <Users className="w-4 h-4 text-emerald-400" />
+              <span className="hidden md:inline">Friends</span>
+              {typeof onlineFriendsCount === 'number' && onlineFriendsCount > 0 && (
+                <span className="px-1.5 py-0.2 bg-emerald-500/30 text-emerald-300 rounded-full text-[10px] font-bold border border-emerald-500/40">
+                  {onlineFriendsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* World Browser button */}
           <button
             id="hud-btn-worlds"
@@ -183,6 +289,23 @@ export const HUD: React.FC<HUDProps> = ({
             <Palette className="w-4 h-4 text-pink-400" />
             <span className="hidden md:inline">Avatar</span>
           </button>
+
+          {/* Chat Toggle button */}
+          {onToggleChat && (
+            <button
+              id="hud-btn-chat"
+              onClick={onToggleChat}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer shadow border ${
+                isChatOpen
+                  ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/50'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+              title="Toggle Multiplayer Chat (])"
+            >
+              <MessageSquare className={`w-4 h-4 ${isChatOpen ? 'text-emerald-400' : 'text-slate-400'}`} />
+              <span className="hidden md:inline">Chat</span>
+            </button>
+          )}
 
           {/* Perspective Toggle (1st person / 3rd person) */}
           <button

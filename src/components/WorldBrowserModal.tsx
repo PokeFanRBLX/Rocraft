@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Compass, Download, Upload, RefreshCw, Check, Sparkles, Shield, Trees, Box } from 'lucide-react';
+import { X, Compass, Download, Upload, RefreshCw, Check, Sparkles, Shield, Trees, Box, Sprout, DoorClosed } from 'lucide-react';
 import { WorldPreset } from '../types';
 
 interface WorldBrowserModalProps {
@@ -15,11 +15,27 @@ interface WorldBrowserModalProps {
 const PRESETS: {
   id: WorldPreset;
   name: string;
-  tag: 'Roblox Classic' | 'Minecraft Classic' | 'PvP Arena' | 'Sandbox';
+  tag: 'Roblox Classic' | 'Minecraft Classic' | 'PvP Arena' | 'Sandbox' | 'Roblox Simulator' | 'Roblox Horror';
   desc: string;
   icon: React.ReactNode;
   accent: string;
 }[] = [
+  {
+    id: 'garden',
+    name: 'Roblox: Grow a Garden',
+    tag: 'Roblox Simulator',
+    desc: 'Peaceful countryside agrarian paradise with blooming flower beds, giant 2x2 prize pumpkins, watermelon furrows, crystal greenhouse, rustic windmill, and lily pond.',
+    icon: <Sprout className="w-6 h-6 text-lime-400" />,
+    accent: 'border-lime-500/40 bg-lime-500/10 hover:border-lime-400'
+  },
+  {
+    id: 'doors',
+    name: 'Roblox: DOORS (The Hotel)',
+    tag: 'Roblox Horror',
+    desc: 'Iconic 1920s haunted hotel! Navigate Room 0000 Reception, crimson velvet hallways, grand brick fireplace, Seek chase corridor with speedpads, and Figure’s towering 2-story Library.',
+    icon: <DoorClosed className="w-6 h-6 text-amber-500" />,
+    accent: 'border-amber-600/40 bg-amber-950/20 hover:border-amber-500'
+  },
   {
     id: 'obby',
     name: 'Mega Rocraft Obby',

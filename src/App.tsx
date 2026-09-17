@@ -8,9 +8,14 @@ import { ControlsModal } from './components/ControlsModal';
 import { VictoryModal } from './components/VictoryModal';
 import { MusicPlayerModal } from './components/MusicPlayerModal';
 import { OwnerPanelModal } from './components/OwnerPanelModal';
-import { AvatarConfig, HotbarSlot, WorldPreset, BlockId } from './types';
+import { ChatWindow } from './components/ChatWindow';
+import { FriendsModal } from './components/FriendsModal';
+import { DailyRewardModal } from './components/DailyRewardModal';
+import { AvatarConfig, HotbarSlot, WorldPreset, BlockId, LobbyInfo, HatType, DailyRewardState } from './types';
 import { soundEngine } from './utils/audio';
 import { isOwnerName } from './utils/ranks';
+import { loadStoredFriends } from './utils/friendsStorage';
+import { recordUserLogin, loadDailyRewardState, addCoinsToBalance, addTixToBalance } from './utils/dailyRewardStorage';
 
 const DEFAULT_AVATAR: AvatarConfig = {
   name: 'PokeFan_',
@@ -77,8 +82,22 @@ export default function App() {
   const [isVictoryModalOpen, setIsVictoryModalOpen] = useState<boolean>(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState<boolean>(false);
   const [isOwnerPanelOpen, setIsOwnerPanelOpen] = useState<boolean>(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState<boolean>(false);
+  const [isDailyRewardModalOpen, setIsDailyRewardModalOpen] = useState<boolean>(false);
+  const [dailyRewardState, setDailyRewardState] = useState<DailyRewardState>(() => loadDailyRewardState());
+  const [currentLobby, setCurrentLobby] = useState<LobbyInfo | null>(null);
+  const [whisperTarget, setWhisperTarget] = useState<string | null>(null);
+  const [onlineFriendsCount, setOnlineFriendsCount] = useState<number>(() => {
+    try {
+      return loadStoredFriends().filter((f) => f.status !== 'offline').length;
+    } catch {
+      return 6;
+    }
+  });
   const [activeAnnouncement, setActiveAnnouncement] = useState<string | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(soundEngine.isMusicActive());
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
+  const [chatNotification, setChatNotification] = useState<string | null>(null);
 
   const isOwner = isOwnerName(avatarConfig.name);
 
@@ -110,6 +129,23 @@ export default function App() {
     };
   }, []);
 
+  // Track daily login streak on mount and auto-prompt if reward is ready
+  useEffect(() => {
+    const loginResult = recordUserLogin();
+    setDailyRewardState(loginResult);
+
+    // If today's login reward is ready, gently open the daily reward window
+    if (loginResult.canClaimToday) {
+      const timer = setTimeout(() => {
+        setIsDailyRewardModalOpen(true);
+        if (document.pointerLockElement) {
+          document.exitPointerLock();
+        }
+      }, 750);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Initialize Game Engine
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -125,7 +161,9 @@ export default function App() {
 
     engine.physics.onStageChange = (stage) => {
       setCurrentStage(stage);
-      setCheckpointMessage(stage === 1 ? '★ Spawn Checkpoint Set!' : `★ Stage ${stage} Checkpoint Saved!`);
+      const msg = stage === 1 ? '★ Spawn Checkpoint Set!' : `★ Stage ${stage} Checkpoint Saved!`;
+      setCheckpointMessage(msg);
+      setChatNotification(msg);
       setTimeout(() => setCheckpointMessage(null), 3200);
     };
 
@@ -135,6 +173,7 @@ export default function App() {
 
     engine.physics.onVictory = () => {
       setIsVictoryModalOpen(true);
+      setChatNotification(`🏆 ${avatarConfig.name} completed the obby!`);
     };
 
     engine.onDayTimeChange = (_time, night) => {
@@ -175,6 +214,43 @@ export default function App() {
   // Global keybinds
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If user is currently typing in an input or textarea, ignore game hotkeys
+      if (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement
+      ) {
+        if (e.key === 'Escape') {
+          (document.activeElement as HTMLElement).blur();
+        }
+        // If typing in input and presses ']' when empty, toggle close chat
+        if ((e.key === ']' || e.code === 'BracketRight') && (document.activeElement as HTMLInputElement).value === '') {
+          e.preventDefault();
+          (document.activeElement as HTMLElement).blur();
+          setIsChatOpen(false);
+        }
+        return;
+      }
+
+      // ']' Key toggles Multiplayer Chat (Open/Close)
+      if (e.key === ']' || e.code === 'BracketRight') {
+        e.preventDefault();
+        setIsChatOpen((prev) => !prev);
+        if (document.pointerLockElement) {
+          document.exitPointerLock();
+        }
+        return;
+      }
+
+      // '/' Key opens Multiplayer Chat (Classic Roblox & Minecraft muscle memory)
+      if (e.key === '/') {
+        e.preventDefault();
+        setIsChatOpen(true);
+        if (document.pointerLockElement) {
+          document.exitPointerLock();
+        }
+        return;
+      }
+
       // '#' Key toggle for Owner Control Panel (works even if other modals are closed)
       if (e.key === '#' || (e.shiftKey && e.code === 'Digit3')) {
         // Prevent typing into gameplay
@@ -206,7 +282,9 @@ export default function App() {
         isControlsModalOpen ||
         isVictoryModalOpen ||
         isMusicModalOpen ||
-        isOwnerPanelOpen
+        isOwnerPanelOpen ||
+        isFriendsModalOpen ||
+        isDailyRewardModalOpen
       ) {
         if (e.key === 'Escape') {
           setIsAvatarModalOpen(false);
@@ -216,6 +294,8 @@ export default function App() {
           setIsVictoryModalOpen(false);
           setIsMusicModalOpen(false);
           setIsOwnerPanelOpen(false);
+          setIsFriendsModalOpen(false);
+          setIsDailyRewardModalOpen(false);
         }
         return;
       }
@@ -225,6 +305,22 @@ export default function App() {
         const digit = parseInt(e.code.replace('Digit', ''), 10);
         if (digit >= 1 && digit <= 9) {
           setActiveSlotIndex(digit - 1);
+        }
+      }
+
+      // 'G' Key opens Daily Login Rewards & Streaks
+      if (e.code === 'KeyG') {
+        setIsDailyRewardModalOpen(true);
+        if (document.pointerLockElement) {
+          document.exitPointerLock();
+        }
+      }
+
+      // 'F' Key opens Friends & Multiplayer Lobbies
+      if (e.code === 'KeyF') {
+        setIsFriendsModalOpen(true);
+        if (document.pointerLockElement) {
+          document.exitPointerLock();
         }
       }
 
@@ -256,8 +352,27 @@ export default function App() {
     isVictoryModalOpen,
     isMusicModalOpen,
     isOwnerPanelOpen,
+    isFriendsModalOpen,
+    isDailyRewardModalOpen,
     avatarConfig.name
   ]);
+
+  // Update online friends count periodically or when storage updates
+  useEffect(() => {
+    const updateCount = () => {
+      try {
+        const count = loadStoredFriends().filter((f) => f.status !== 'offline').length;
+        setOnlineFriendsCount(count);
+      } catch {}
+    };
+
+    window.addEventListener('storage', updateCount);
+    const interval = setInterval(updateCount, 12000);
+    return () => {
+      window.removeEventListener('storage', updateCount);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Actions
   const handleTogglePerspective = useCallback(() => {
@@ -289,15 +404,41 @@ export default function App() {
     }
   };
 
+  const handleEquipHat = useCallback((hat: HatType) => {
+    setAvatarConfig((prev) => {
+      const next = { ...prev, hat };
+      try {
+        localStorage.setItem('rocraft_avatar', JSON.stringify(next));
+      } catch {}
+      if (engineRef.current) {
+        engineRef.current.avatar.updateConfig(next);
+      }
+      return next;
+    });
+    setChatNotification(`👒 Equipped exclusive accessory: ${hat.replace('_', ' ')}!`);
+    setTimeout(() => setChatNotification(null), 4000);
+  }, []);
+
   const handleSelectPreset = (preset: WorldPreset) => {
     setWorldPreset(preset);
     if (engineRef.current) {
-      engineRef.current.world.generatePreset(preset);
-      engineRef.current.physics.resetPlayerToSpawn();
-      setWorldName(engineRef.current.world.name);
+      engineRef.current.loadPreset(preset);
+      const newName = engineRef.current.world.name;
+      setWorldName(newName);
       setCurrentStage(1);
+      setChatNotification(`World loaded: ${newName}`);
     }
   };
+
+  const handleJoinLobby = useCallback((lobby: LobbyInfo, friendName?: string) => {
+    setCurrentLobby(lobby);
+    handleSelectPreset(lobby.preset);
+    soundEngine.playJoinLobby();
+    const friendLabel = friendName ? `${friendName}'s ` : '';
+    setChatNotification(`🚀 Connected to ${friendLabel}lobby "${lobby.name}"! (${lobby.playersCount + 1}/${lobby.maxPlayers} Players • ${lobby.pingMs}ms)`);
+    setCheckpointMessage(`★ Joined Lobby: ${lobby.name}`);
+    setTimeout(() => setCheckpointMessage(null), 4000);
+  }, []);
 
   const handleExportWorld = () => {
     if (engineRef.current) {
@@ -316,8 +457,7 @@ export default function App() {
 
   const handleResetWorld = () => {
     if (engineRef.current) {
-      engineRef.current.world.generatePreset(worldPreset);
-      engineRef.current.physics.resetPlayerToSpawn();
+      engineRef.current.loadPreset(worldPreset);
     }
   };
 
@@ -422,12 +562,75 @@ export default function App() {
         isOwner={isOwner}
         playerName={avatarConfig.name}
         activeAnnouncement={activeAnnouncement}
+        isChatOpen={isChatOpen}
+        onToggleChat={() => setIsChatOpen((prev) => !prev)}
+        onOpenFriendsModal={() => {
+          setIsFriendsModalOpen(true);
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        }}
+        onlineFriendsCount={onlineFriendsCount}
+        currentLobbyName={currentLobby?.name}
+        coins={dailyRewardState.coins}
+        tix={dailyRewardState.tix}
+        onOpenDailyRewardModal={() => {
+          setIsDailyRewardModalOpen(true);
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        }}
+        canClaimDailyReward={dailyRewardState.canClaimToday}
+        currentStreak={dailyRewardState.currentStreak}
         onOpenOwnerPanel={() => {
           setIsOwnerPanelOpen(true);
           soundEngine.playOwnerFanfare();
           if (document.pointerLockElement) {
             document.exitPointerLock();
           }
+        }}
+      />
+
+      {/* Multiplayer Chat Window with Rainbow-Text for OWNER Messages */}
+      <ChatWindow
+        playerName={avatarConfig.name}
+        isOwner={isOwner}
+        isOpen={isChatOpen}
+        onToggleOpen={() => setIsChatOpen((prev) => !prev)}
+        systemNotification={chatNotification}
+        worldName={worldName}
+        onOpenOwnerPanel={() => {
+          setIsOwnerPanelOpen(true);
+          soundEngine.playOwnerFanfare();
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        }}
+        onOpenFriendsModal={() => {
+          setIsFriendsModalOpen(true);
+          if (document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        }}
+        whisperTarget={whisperTarget}
+        onClearWhisper={() => setWhisperTarget(null)}
+        onExecuteCommand={(cmd) => {
+          if (cmd === 'oof' || cmd === 'die' || cmd === 'reset') {
+            handleResetCharacter();
+          }
+        }}
+      />
+
+      {/* Friends & Multiplayer Lobbies Modal (Key: F) */}
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
+        currentPreset={worldPreset}
+        currentLobby={currentLobby}
+        onJoinLobby={handleJoinLobby}
+        onOpenChatWithWhisper={(targetPlayer) => {
+          setWhisperTarget(targetPlayer);
+          setIsChatOpen(true);
         }}
       />
 
@@ -443,6 +646,30 @@ export default function App() {
           setActiveAnnouncement(msg);
           setTimeout(() => setActiveAnnouncement(null), 8000);
         }}
+        currentLobby={currentLobby}
+        myCoins={dailyRewardState.coins}
+        myTix={dailyRewardState.tix || 0}
+        onGiveMyCurrency={(coinsDelta, tixDelta) => {
+          let newCoins = dailyRewardState.coins;
+          let newTix = dailyRewardState.tix || 0;
+          if (coinsDelta > 0) {
+            newCoins = addCoinsToBalance(coinsDelta);
+          }
+          if (tixDelta > 0) {
+            newTix = addTixToBalance(tixDelta);
+          }
+          setDailyRewardState((prev) => ({
+            ...prev,
+            coins: newCoins,
+            tix: newTix
+          }));
+        }}
+        onSendChatMessage={(msg) => {
+          setChatNotification(msg);
+          setTimeout(() => {
+            setChatNotification((prev) => (prev === msg ? null : prev));
+          }, 4000);
+        }}
       />
 
       {/* Boombox & Soundtrack Modal */}
@@ -457,6 +684,29 @@ export default function App() {
         currentConfig={avatarConfig}
         onClose={() => setIsAvatarModalOpen(false)}
         onSave={handleSaveAvatar}
+        onOpenDailyRewards={() => {
+          setIsAvatarModalOpen(false);
+          setIsDailyRewardModalOpen(true);
+        }}
+        onCoinsChanged={(newBalance) => {
+          setDailyRewardState((prev) => ({ ...prev, coins: newBalance }));
+        }}
+        onTixChanged={(newTix) => {
+          setDailyRewardState((prev) => ({ ...prev, tix: newTix }));
+        }}
+      />
+
+      {/* Daily Login Rewards & Streaks Modal (Key: G) */}
+      <DailyRewardModal
+        isOpen={isDailyRewardModalOpen}
+        onClose={() => setIsDailyRewardModalOpen(false)}
+        onEquipHat={handleEquipHat}
+        onCoinsChanged={(newBalance) => {
+          setDailyRewardState((prev) => ({ ...prev, coins: newBalance }));
+        }}
+        onTixChanged={(newTix) => {
+          setDailyRewardState((prev) => ({ ...prev, tix: newTix }));
+        }}
       />
 
       {/* World Browser Modal */}

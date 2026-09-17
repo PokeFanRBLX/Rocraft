@@ -1,6 +1,6 @@
 {
   "name": "Rocraft",
-  "description": "A hybrid 3D voxel sandbox and Roblox-style game engine featuring voxel building, blocky avatars, Wobbly Life physics for walking and jumping, obby parkour, interactive physics gadgets, and custom worlds.",
+  "description": "A hybrid 3D voxel sandbox and Roblox-style game engine featuring voxel building, blocky avatars, daily login rewards and streaks with exclusive mythic hats, TIX and Blox Coins currencies, friends and multiplayer lobbies, chat with rainbow text for OWNER rank, obby parkour, and custom worlds.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

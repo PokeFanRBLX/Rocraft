@@ -352,6 +352,171 @@ export class CharacterAvatar {
         wing.rotation.z = dir * -0.3;
         group.add(wing);
       });
+    } else if (hatType === 'dino_hood') {
+      // Chomper Dino Hood (Green hood with sharp white teeth and dorsal spines)
+      const greenMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3 });
+      const hood = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.65),
+        greenMat
+      );
+      hood.position.y = -0.02;
+      group.add(hood);
+
+      // White teeth lining front rim
+      const toothMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+      for (let i = -2; i <= 2; i++) {
+        const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.11, 4), toothMat);
+        tooth.position.set(i * 0.09, -0.08, 0.36);
+        tooth.rotation.x = Math.PI;
+        group.add(tooth);
+      }
+
+      // Orange dorsal spines along ridge
+      const spineMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3 });
+      for (let i = 0; i < 4; i++) {
+        const spine = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 4), spineMat);
+        spine.position.set(0, 0.18 + i * 0.08, 0.15 - i * 0.15);
+        spine.rotation.x = -0.35 + i * 0.2;
+        group.add(spine);
+      }
+
+      // Cute eye domes on sides
+      const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+      [-1, 1].forEach((dir) => {
+        const eyeDome = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), eyeWhiteMat);
+        eyeDome.position.set(dir * 0.36, 0.2, 0.22);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), pupilMat);
+        pupil.position.set(dir * 0.39, 0.2, 0.26);
+        group.add(eyeDome);
+        group.add(pupil);
+      });
+    } else if (hatType === 'cyber_visor') {
+      // Cyber Neon Visor (High-tech glowing cyberpunk HUD visor)
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.2 });
+      const visorBand = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.14, 0.28), frameMat);
+      visorBand.position.set(0, -0.08, 0.2);
+      group.add(visorBand);
+
+      // Glowing cyan neon screen plate
+      const neonMat = new THREE.MeshStandardMaterial({
+        color: 0x06b6d4,
+        emissive: 0x06b6d4,
+        emissiveIntensity: 0.85,
+        roughness: 0.1
+      });
+      const neonScreen = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.11, 0.05), neonMat);
+      neonScreen.position.set(0, -0.08, 0.34);
+      group.add(neonScreen);
+
+      // Side audio / antenna modules
+      const earMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 });
+      const ledMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.9 });
+      [-1, 1].forEach((dir) => {
+        const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 12), earMat);
+        ear.rotation.z = Math.PI / 2;
+        ear.position.set(dir * 0.39, -0.08, 0.15);
+        const led = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), ledMat);
+        led.position.set(dir * 0.44, -0.05, 0.18);
+        group.add(ear);
+        group.add(led);
+      });
+    } else if (hatType === 'wizard_hat') {
+      // Mystic Wizard Hat (Deep indigo conical hat with golden stars and buckle)
+      const indigoMat = new THREE.MeshStandardMaterial({ color: 0x3730a3, roughness: 0.4 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7, roughness: 0.2 });
+
+      // Wide brim
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.04, 20), indigoMat);
+      brim.position.y = -0.02;
+      group.add(brim);
+
+      // Lower cone
+      const lowerCone = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.38, 0.42, 16), indigoMat);
+      lowerCone.position.y = 0.2;
+      group.add(lowerCone);
+
+      // Golden band & buckle
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.39, 0.08, 16), goldMat);
+      band.position.y = 0.04;
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.05), goldMat);
+      buckle.position.set(0, 0.04, 0.38);
+      group.add(band);
+      group.add(buckle);
+
+      // Tipped crooked peak
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 16), indigoMat);
+      peak.position.set(0, 0.58, -0.06);
+      peak.rotation.x = -0.22;
+      group.add(peak);
+
+      // Golden star on tip
+      const star = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), goldMat);
+      star.position.set(0, 0.85, -0.12);
+      group.add(star);
+    } else if (hatType === 'dominus') {
+      // Dominus Aureus (Legendary Roblox mythic cowl with shadowy face, glowing yellow eyes, and golden horns)
+      const cowlMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.35 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.15 });
+
+      // Outer hood covering top, sides, and back
+      const hoodTop = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.42, 0.72), cowlMat);
+      hoodTop.position.y = 0.15;
+      group.add(hoodTop);
+
+      // Hood flaps framing face
+      [-1, 1].forEach((dir) => {
+        const flap = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.45, 0.45), cowlMat);
+        flap.position.set(dir * 0.32, -0.15, 0.1);
+        group.add(flap);
+      });
+
+      // Shadowy visor interior
+      const shadowMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
+      const shadowDepth = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.32, 0.2), shadowMat);
+      shadowDepth.position.set(0, -0.1, 0.22);
+      group.add(shadowDepth);
+
+      // Iconic twin glowing yellow eye orbs inside the shadow
+      const eyeGlowMat = new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        emissive: 0xfacc15,
+        emissiveIntensity: 1.0,
+        roughness: 0.1
+      });
+      [-1, 1].forEach((dir) => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), eyeGlowMat);
+        eye.position.set(dir * 0.14, -0.09, 0.29);
+        group.add(eye);
+      });
+
+      // Flared golden horns on left and right
+      [-1, 1].forEach((dir) => {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.58, 8), goldMat);
+        horn.position.set(dir * 0.42, 0.28, -0.08);
+        horn.rotation.z = dir * -0.75;
+        horn.rotation.x = -0.3;
+        group.add(horn);
+
+        // Golden circular medallion on hood flank
+        const medallion = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 12), goldMat);
+        medallion.rotation.z = Math.PI / 2;
+        medallion.position.set(dir * 0.38, 0.05, 0.15);
+        group.add(medallion);
+      });
+    } else if (hatType === 'halo') {
+      // Golden Angel Halo (Floating radiant gold ring above the head)
+      const haloMat = new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        emissive: 0xfacc15,
+        emissiveIntensity: 0.85,
+        metalness: 0.7,
+        roughness: 0.15
+      });
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.04, 12, 24), haloMat);
+      halo.position.set(0, 0.52, -0.02);
+      halo.rotation.x = Math.PI / 2 + 0.18;
+      group.add(halo);
     }
   }
 
@@ -884,5 +1049,27 @@ export class CharacterAvatar {
 
   public triggerSwing() {
     this.triggerSlash();
+  }
+
+  public setGhostMode(isGhost: boolean) {
+    this.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((mat) => {
+            mat.transparent = isGhost;
+            mat.opacity = isGhost ? 0.45 : 1.0;
+            mat.needsUpdate = true;
+          });
+        } else {
+          obj.material.transparent = isGhost;
+          obj.material.opacity = isGhost ? 0.45 : 1.0;
+          obj.material.needsUpdate = true;
+        }
+      }
+    });
+  }
+
+  public setAvatarScale(scale: number) {
+    this.group.scale.set(scale, scale, scale);
   }
 }

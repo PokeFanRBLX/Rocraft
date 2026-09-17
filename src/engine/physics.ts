@@ -49,20 +49,102 @@ export class PhysicsEngine {
   public onVictory?: () => void;
   public onHealthChange?: (hp: number) => void;
 
-  // Owner Rank Powers
+  // Owner Rank Powers & Cheats
   public isGodMode: boolean = false;
   public isFlying: boolean = false;
   public isNoclip: boolean = false;
+  public infiniteJump: boolean = false;
+  public forcefield: boolean = false;
+  public gravityMultiplier: number = 1.0;
   public speedMultiplier: number = 1.0;
   public jumpMultiplier: number = 1.0;
   public rainbowAura: boolean = false;
+  public timeScale: number = 1.0;
   public savedWaypoint: THREE.Vector3 | null = null;
+  private wasJumpPressedLastFrame: boolean = false;
+  private forcefieldMesh: THREE.Mesh | null = null;
 
   constructor(world: VoxelWorld, avatar: CharacterAvatar, scene: THREE.Scene) {
     this.world = world;
     this.avatar = avatar;
     this.scene = scene;
     this.resetPlayerToSpawn();
+  }
+
+  public setNoclipMode(enabled: boolean) {
+    this.isNoclip = enabled;
+    this.playerVel.set(0, 0, 0);
+    this.avatar.setGhostMode(enabled);
+    if (enabled) {
+      this.isDead = false;
+      this.health = this.maxHealth;
+      if (this.onHealthChange) this.onHealthChange(this.health);
+    }
+  }
+
+  public setFlyingMode(enabled: boolean) {
+    this.isFlying = enabled;
+    if (enabled) {
+      this.playerVel.y = 0;
+      this.isGrounded = false;
+    }
+  }
+
+  public setInfiniteJump(enabled: boolean) {
+    this.infiniteJump = enabled;
+  }
+
+  public setForcefield(enabled: boolean) {
+    this.forcefield = enabled;
+    if (enabled) {
+      if (!this.forcefieldMesh) {
+        const geo = new THREE.SphereGeometry(1.65, 18, 18);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.65
+        });
+        this.forcefieldMesh = new THREE.Mesh(geo, mat);
+        this.scene.add(this.forcefieldMesh);
+      }
+      this.forcefieldMesh.visible = true;
+    } else {
+      if (this.forcefieldMesh) {
+        this.forcefieldMesh.visible = false;
+      }
+    }
+  }
+
+  public setAvatarScale(scale: number) {
+    this.avatar.setAvatarScale(scale);
+  }
+
+  public spawnNukeTNTBarrage(count: number = 8) {
+    const px = Math.round(this.playerPos.x);
+    const py = Math.round(this.playerPos.y + 2);
+    const pz = Math.round(this.playerPos.z);
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const dist = 3.5;
+      const tx = px + Math.cos(angle) * dist;
+      const tz = pz + Math.sin(angle) * dist;
+      this.spawnPrimedTNT(tx, py, tz);
+    }
+    soundEngine.playExplosion();
+  }
+
+  public skipStage(deltaStages: number) {
+    const maxStages = (this.world.checkpoints && this.world.checkpoints.length) || 10;
+    const newStage = Math.max(1, Math.min(maxStages, this.currentStage + deltaStages));
+    this.currentStage = newStage;
+    if (this.world.checkpoints && this.world.checkpoints[newStage - 1]) {
+      const [cx, cy, cz] = this.world.checkpoints[newStage - 1];
+      this.teleportTo(cx, cy + 1.2, cz);
+    } else {
+      this.teleportTo(0, (newStage - 1) * 1.5 + 4, (newStage - 1) * 12 + 2);
+    }
+    if (this.onStageChange) this.onStageChange(newStage);
   }
 
   public resetPlayerToSpawn() {
@@ -93,7 +175,7 @@ export class PhysicsEngine {
   }
 
   public killPlayer() {
-    if (this.isDead || this.isGodMode) return;
+    if (this.isDead || this.isGodMode || this.isNoclip) return;
     this.isDead = true;
     this.health = 0;
     this.deaths++;
@@ -105,19 +187,21 @@ export class PhysicsEngine {
 
   public update(
     delta: number,
-    moveInput: { forward: number; strafe: number; jump: boolean },
+    moveInput: { forward: number; strafe: number; jump: boolean; crouch?: boolean },
     cameraYaw: number,
     cameraDirection: THREE.Vector3
   ) {
+    const effectiveDelta = delta * this.timeScale;
+
     // 1. Handle Respawn Timer if dead
     if (this.isDead) {
-      this.respawnTimer -= delta;
-      this.avatar.updateAnimation(delta, false, false);
+      this.respawnTimer -= effectiveDelta;
+      this.avatar.updateAnimation(effectiveDelta, false, false);
       if (this.respawnTimer <= 0) {
         this.respawnAtCheckpoint();
       }
-      this.updateParticles(delta);
-      this.updateRockets(delta);
+      this.updateParticles(effectiveDelta);
+      this.updateRockets(effectiveDelta);
       return;
     }
 
@@ -126,7 +210,7 @@ export class PhysicsEngine {
     const hasSpeedCoil = this.avatar.heldToolId === 'speed_coil';
 
     const baseSpeed = (hasSpeedCoil ? 13.5 : 6.2) * this.speedMultiplier;
-    const gravity = hasGravityCoil ? 11.0 : 25.0;
+    const gravity = (hasGravityCoil ? 11.0 : 25.0) * this.gravityMultiplier;
     const jumpStrength = (hasGravityCoil ? 14.0 : 8.8) * this.jumpMultiplier;
 
     // Emit speed coil trail particles
@@ -155,9 +239,9 @@ export class PhysicsEngine {
       );
     }
 
-    if (this.isFlying) {
-      // Free 3D Flight
-      const flySpeed = 16.0 * this.speedMultiplier;
+    if (this.isFlying || this.isNoclip) {
+      // Free 3D Flight / Ghost Noclip Mode (Zero gravity, 6-DOF controls)
+      const flySpeed = (this.isNoclip ? 20.0 : 16.0) * this.speedMultiplier;
       const flyDir = new THREE.Vector3();
       if (moveInput.forward !== 0 || moveInput.strafe !== 0) {
         flyDir.addScaledVector(cameraDirection, moveInput.forward);
@@ -166,14 +250,16 @@ export class PhysicsEngine {
         if (flyDir.lengthSq() > 0) flyDir.normalize();
       }
 
-      this.playerVel.x = THREE.MathUtils.lerp(this.playerVel.x, flyDir.x * flySpeed, 0.22);
-      this.playerVel.z = THREE.MathUtils.lerp(this.playerVel.z, flyDir.z * flySpeed, 0.22);
+      this.playerVel.x = THREE.MathUtils.lerp(this.playerVel.x, flyDir.x * flySpeed, 0.26);
+      this.playerVel.z = THREE.MathUtils.lerp(this.playerVel.z, flyDir.z * flySpeed, 0.26);
 
       let targetY = flyDir.y * flySpeed;
       if (moveInput.jump) {
-        targetY = 12.0 * this.speedMultiplier;
+        targetY = 14.0 * this.speedMultiplier;
+      } else if (moveInput.crouch) {
+        targetY = -14.0 * this.speedMultiplier;
       }
-      this.playerVel.y = THREE.MathUtils.lerp(this.playerVel.y, targetY, 0.22);
+      this.playerVel.y = THREE.MathUtils.lerp(this.playerVel.y, targetY, 0.26);
       this.isGrounded = false;
     } else {
       // 3. Grounded / Standard Movement input mapped to camera angle
@@ -218,14 +304,15 @@ export class PhysicsEngine {
         let diff = targetAngle - this.avatar.group.rotation.y;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        this.avatar.group.rotation.y += diff * Math.min(1.0, delta * 14.0);
+        this.avatar.group.rotation.y += diff * Math.min(1.0, effectiveDelta * 14.0);
       } else {
         this.playerVel.x *= friction;
         this.playerVel.z *= friction;
       }
 
-      // Jump handling with wobbly stretch and launch puff
-      if (moveInput.jump && this.isGrounded) {
+      // Jump handling: Grounded Jump OR Infinite Air Jump
+      const canJump = this.isGrounded || this.infiniteJump;
+      if (moveInput.jump && canJump && (this.isGrounded || !this.wasJumpPressedLastFrame)) {
         this.playerVel.y = jumpStrength;
         this.isGrounded = false;
         this.avatar.triggerWobblyJump(jumpStrength);
@@ -238,19 +325,25 @@ export class PhysicsEngine {
       }
 
       // Gravity
-      this.playerVel.y -= gravity * delta;
+      this.playerVel.y -= gravity * effectiveDelta;
       if (this.playerVel.y < -35) this.playerVel.y = -35; // Terminal velocity
     }
 
-    // 4. Voxel AABB Collision & Integration
-    this.moveWithCollision(delta);
+    this.wasJumpPressedLastFrame = moveInput.jump;
 
-    // 5. Special Block Underneath / Intersections Check
-    this.checkBlockInteractions();
+    // 4. Voxel AABB Collision & Integration
+    this.moveWithCollision(effectiveDelta);
+
+    // 5. Special Block Underneath / Intersections Check (bypassed in noclip)
+    if (!this.isNoclip) {
+      this.checkBlockInteractions();
+    }
 
     // 6. Void Fall Check
     if (this.playerPos.y < -15) {
-      if (this.isGodMode) {
+      if (this.isNoclip) {
+        // In noclip ghost mode, explore freely under the map without void death or death loop!
+      } else if (this.isGodMode) {
         this.playerPos.copy(this.lastCheckpoint);
         this.playerPos.y += 1.5;
         this.playerVel.set(0, 0, 0);
@@ -260,15 +353,37 @@ export class PhysicsEngine {
       }
     }
 
+    // Forcefield aura update
+    if (this.forcefield && this.forcefieldMesh) {
+      this.forcefieldMesh.position.copy(this.playerPos);
+      this.forcefieldMesh.position.y += 0.9;
+      this.forcefieldMesh.rotation.y += effectiveDelta * 2.0;
+      this.forcefieldMesh.rotation.x += effectiveDelta * 1.2;
+
+      // Deflect any nearby dummies
+      for (const d of this.dummyList) {
+        const dDist = d.avatar.group.position.distanceTo(this.playerPos);
+        if (dDist < 2.5) {
+          const pushDir = d.avatar.group.position.clone().sub(this.playerPos).normalize();
+          d.dummy.position[0] += pushDir.x * 1.5;
+          d.dummy.position[2] += pushDir.z * 1.5;
+          d.avatar.group.position.set(d.dummy.position[0], d.dummy.position[1], d.dummy.position[2]);
+          d.avatar.triggerWobblyBump(pushDir.x, pushDir.z);
+          soundEngine.playGravityBoing();
+          this.spawnParticle(d.avatar.group.position.clone(), new THREE.Vector3(0, 1, 0), 0x38bdf8, 0.2, 0.4);
+        }
+      }
+    }
+
     // 7. Update Avatar position & animation
     this.avatar.group.position.copy(this.playerPos);
     const isMoving = Math.abs(this.playerVel.x) > 0.3 || Math.abs(this.playerVel.z) > 0.3;
-    this.avatar.updateAnimation(delta, isMoving, this.isGrounded, this.playerVel, this.avatar.group.rotation.y);
+    this.avatar.updateAnimation(effectiveDelta, isMoving, this.isGrounded, this.playerVel, this.avatar.group.rotation.y);
 
     // 8. Update Projectiles & Particles & Dummies
-    this.updateRockets(delta);
-    this.updateParticles(delta);
-    this.updateDummies(delta);
+    this.updateRockets(effectiveDelta);
+    this.updateParticles(effectiveDelta);
+    this.updateDummies(effectiveDelta);
   }
 
   private moveWithCollision(delta: number) {
@@ -896,5 +1011,14 @@ export class PhysicsEngine {
       this.spawnBlockParticles(dx, this.playerPos.y + 1, dz, 0x38bdf8, 12);
     }
     soundEngine.playPowerup();
+  }
+
+  public destroy() {
+    if (this.forcefieldMesh) {
+      this.scene.remove(this.forcefieldMesh);
+      this.forcefieldMesh.geometry.dispose();
+      (this.forcefieldMesh.material as THREE.Material).dispose();
+      this.forcefieldMesh = null;
+    }
   }
 }

@@ -648,6 +648,60 @@ class SoundEngine {
   }
 
   /**
+   * Multiplayer Join Lobby warp teleport sound
+   */
+  public playJoinLobby() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Ascending harmonic chords with stereo sweep feel
+    const freqs = [330, 440, 554.37, 659.25, 880, 1108.7];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + i * 0.045;
+      osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(f * 0.8, start);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.2, start + 0.18);
+
+      gain.gain.setValueAtTime(0.18, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.25);
+    });
+  }
+
+  /**
+   * Friend added / request accepted cheerful chime
+   */
+  public playFriendSuccess() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const notes = [587.33, 739.99, 880, 1174.66]; // D5, F#5, A5, D6
+    notes.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + i * 0.06;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, start);
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.22);
+    });
+  }
+
+  /**
    * Owner GUI & Rank fanfare
    */
   public playOwnerFanfare() {
@@ -670,6 +724,186 @@ class SoundEngine {
       osc.start(start);
       osc.stop(start + 0.22);
     });
+  }
+
+  /**
+   * Roblox: DOORS eerie horror sting & ambient hotel chord
+   */
+  public playDoorsSting() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Deep sub drone
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(55, now);
+    subOsc.frequency.linearRampToValueAtTime(45, now + 1.2);
+    subGain.gain.setValueAtTime(0.25, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    subOsc.connect(subGain);
+    subGain.connect(ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 1.5);
+
+    // Eerie minor dissonant chords: D3 (146.8), F3 (174.6), G#3 (207.6), C4 (261.6)
+    const eeriePitches = [146.83, 174.61, 207.65, 261.63];
+    eeriePitches.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + idx * 0.08;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.linearRampToValueAtTime(freq * 0.98, start + 1.2);
+      gain.gain.setValueAtTime(0.18, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 1.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 1.4);
+    });
+  }
+
+  /**
+   * Roblox: Grow a Garden cheerful pastoral melody
+   */
+  public playGardenWelcome() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Cheerful acoustic chime arpeggio: C4, E4, G4, A4, C5
+    const gardenPitches = [261.63, 329.63, 392.00, 440.00, 523.25];
+    gardenPitches.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + idx * 0.07;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.22, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.5);
+    });
+  }
+
+  /**
+   * Sound effect when player sends a chat message
+   */
+  public playChatSend() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  }
+
+  /**
+   * Sound effect when incoming chat message arrives
+   */
+  public playChatMessage() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(540, now);
+    osc.frequency.exponentialRampToValueAtTime(720, now + 0.07);
+
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  /**
+   * Pleasant double-ping chime for coins, favorites, and share actions
+   */
+  public playCollectCoin() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const notes = [987.77, 1318.51]; // B5, E6
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + idx * 0.08;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    });
+  }
+
+  /**
+   * Triumphant daily login streak fanfare with sparkling arpeggio & bass hit
+   */
+  public playDailyClaim() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Ascending celebratory major chord arpeggio: C5, E5, G5, B5, C6, G6
+    const arpeggio = [523.25, 659.25, 783.99, 987.77, 1046.5, 1567.98];
+    arpeggio.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const noteStart = now + i * 0.07;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, noteStart);
+      gain.gain.setValueAtTime(0.25, noteStart);
+      gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(noteStart);
+      osc.stop(noteStart + 0.35);
+    });
+
+    // Sub bass impact
+    const bass = ctx.createOscillator();
+    const bassGain = ctx.createGain();
+    bass.type = 'sine';
+    bass.frequency.setValueAtTime(130.81, now); // C3
+    bass.frequency.exponentialRampToValueAtTime(65.41, now + 0.4); // C2
+    bassGain.gain.setValueAtTime(0.3, now);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    bass.connect(bassGain);
+    bassGain.connect(ctx.destination);
+    bass.start(now);
+    bass.stop(now + 0.45);
   }
 
   // ================= BOOMBOX & SOUNDTRACK ENGINE ================= //

@@ -181,6 +181,65 @@ export const BLOCK_DEFINITIONS: Record<BlockId, BlockDef> = {
     emissive: '#facc15',
     isTrophy: true,
     soundType: 'metal'
+  },
+  flower: {
+    id: 'flower',
+    name: 'Flower Garden Bed',
+    category: 'roblox',
+    description: 'Vibrant blooming floral patch from Grow a Garden.',
+    color: '#f43f5e',
+    soundType: 'grass'
+  },
+  pumpkin: {
+    id: 'pumpkin',
+    name: 'Carved Giant Pumpkin',
+    category: 'minecraft',
+    description: 'Prize orange ribbed pumpkin harvested from the farm.',
+    color: '#ea580c',
+    emissive: '#ea580c',
+    soundType: 'wood'
+  },
+  melon: {
+    id: 'melon',
+    name: 'Watermelon Block',
+    category: 'minecraft',
+    description: 'Striped sweet garden melon grown on agrarian soil.',
+    color: '#16a34a',
+    soundType: 'wood'
+  },
+  water: {
+    id: 'water',
+    name: 'Garden Spring Water',
+    category: 'minecraft',
+    description: 'Clear sparkling water channel for watering garden crops.',
+    color: '#38bdf8',
+    transparent: true,
+    opacity: 0.7,
+    soundType: 'glass'
+  },
+  carpet: {
+    id: 'carpet',
+    name: 'Hotel Red Runner',
+    category: 'roblox',
+    description: 'Crimson gold-trimmed hotel hallway runner carpet from DOORS.',
+    color: '#991b1b',
+    soundType: 'wood'
+  },
+  wallpaper: {
+    id: 'wallpaper',
+    name: 'Victorian Hotel Wall',
+    category: 'roblox',
+    description: 'Dark vintage mahogany wood & damask wallpaper from DOORS.',
+    color: '#451a03',
+    soundType: 'wood'
+  },
+  doorblock: {
+    id: 'doorblock',
+    name: 'Room Door #0001',
+    category: 'roblox',
+    description: 'Heavy numbered hotel room door with brass handle from DOORS.',
+    color: '#78350f',
+    soundType: 'wood'
   }
 };
 

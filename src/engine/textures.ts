@@ -369,6 +369,184 @@ export function getBlockTexture(blockId: BlockId, side: 'top' | 'side' | 'bottom
       ctx.fillText('🏆', 32, 32);
       break;
 
+    case 'flower':
+      // Lush flower garden bed with multicolored blossoms
+      ctx.fillStyle = '#166534';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.fillStyle = '#22c55e';
+      for (let x = 0; x < 64; x += 8) {
+        for (let y = 0; y < 64; y += 8) {
+          if ((x + y) % 16 === 0) ctx.fillRect(x, y, 6, 6);
+        }
+      }
+      // Flowers (roses, daisies, bluebells)
+      const flowers = [
+        { x: 14, y: 14, color: '#f43f5e', center: '#fef08a' },
+        { x: 46, y: 16, color: '#eab308', center: '#78350f' },
+        { x: 18, y: 46, color: '#38bdf8', center: '#ffffff' },
+        { x: 44, y: 44, color: '#ec4899', center: '#fef08a' },
+        { x: 30, y: 30, color: '#a855f7', center: '#fde047' }
+      ];
+      flowers.forEach((f) => {
+        ctx.fillStyle = f.color;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = f.center;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+
+    case 'pumpkin':
+      ctx.fillStyle = '#ea580c';
+      ctx.fillRect(0, 0, 64, 64);
+      // Ribbed pumpkin stripes
+      ctx.fillStyle = '#c2410c';
+      for (let x = 0; x < 64; x += 16) {
+        ctx.fillRect(x, 0, 3, 64);
+      }
+      if (side === 'top') {
+        // Green stem on top
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(26, 26, 12, 12);
+        ctx.fillStyle = '#4ade80';
+        ctx.fillRect(28, 28, 8, 8);
+      } else if (side === 'side') {
+        // Glowing carved pumpkin face
+        ctx.fillStyle = '#fef08a';
+        // Triangle eyes
+        ctx.beginPath();
+        ctx.moveTo(18, 20); ctx.lineTo(26, 32); ctx.lineTo(10, 32); ctx.closePath();
+        ctx.moveTo(46, 20); ctx.lineTo(54, 32); ctx.lineTo(38, 32); ctx.closePath();
+        // Nose
+        ctx.moveTo(32, 34); ctx.lineTo(36, 42); ctx.lineTo(28, 42); ctx.closePath();
+        ctx.fill();
+        // Jagged smile
+        ctx.beginPath();
+        ctx.moveTo(14, 46); ctx.lineTo(20, 52); ctx.lineTo(26, 46);
+        ctx.lineTo(32, 54); ctx.lineTo(38, 46); ctx.lineTo(44, 52);
+        ctx.lineTo(50, 46); ctx.lineTo(44, 56); ctx.lineTo(20, 56); ctx.closePath();
+        ctx.fill();
+      }
+      break;
+
+    case 'melon':
+      if (side === 'top' || side === 'bottom') {
+        // Juicy pink-red watermelon interior with black seeds
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(0, 0, 64, 64);
+        ctx.fillStyle = '#bbf7d0';
+        ctx.fillRect(4, 4, 56, 56);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(8, 8, 48, 48);
+        // Seeds
+        ctx.fillStyle = '#18181b';
+        const seeds = [[20, 20], [44, 20], [32, 32], [22, 44], [42, 42]];
+        seeds.forEach(([sx, sy]) => {
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 2, 4, Math.PI / 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // Striped watermelon rind
+        ctx.fillStyle = '#166534';
+        ctx.fillRect(0, 0, 64, 64);
+        ctx.fillStyle = '#4ade80';
+        for (let x = 4; x < 64; x += 16) {
+          ctx.fillRect(x, 0, 8, 64);
+          for (let y = 0; y < 64; y += 8) {
+            if ((x + y) % 12 === 0) ctx.fillRect(x + 2, y, 4, 6);
+          }
+        }
+      }
+      break;
+
+    case 'water':
+      // Garden spring water with shimmering ripples
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.fillStyle = '#38bdf8';
+      for (let y = 6; y < 64; y += 14) {
+        ctx.fillRect(4, y, 24, 3);
+        ctx.fillRect(36, y + 6, 22, 3);
+      }
+      ctx.fillStyle = '#e0f2fe';
+      ctx.fillRect(10, 16, 8, 2);
+      ctx.fillRect(40, 36, 10, 2);
+      break;
+
+    case 'carpet':
+      // DOORS crimson hotel runner carpet with golden borders
+      ctx.fillStyle = '#881337';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.fillStyle = '#9f1239';
+      ctx.fillRect(6, 6, 52, 52);
+      // Gold ornate border trim
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(6, 6, 52, 52);
+      // Gold diamond center emblem
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.moveTo(32, 16); ctx.lineTo(48, 32); ctx.lineTo(32, 48); ctx.lineTo(16, 32); ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(32, 22); ctx.lineTo(42, 32); ctx.lineTo(32, 42); ctx.lineTo(22, 32); ctx.closePath();
+      ctx.fill();
+      break;
+
+    case 'wallpaper':
+      // DOORS Victorian dark mahogany wood & damask hotel wallpaper
+      ctx.fillStyle = '#291508';
+      ctx.fillRect(0, 0, 64, 64);
+      // Lower wainscoting panel
+      ctx.fillStyle = '#451a03';
+      ctx.fillRect(0, 36, 64, 28);
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(4, 40, 56, 20);
+      ctx.strokeStyle = '#291508';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(6, 42, 52, 16);
+      // Upper vintage pattern with gold filigree stripes
+      ctx.fillStyle = '#3f1909';
+      ctx.fillRect(0, 0, 64, 36);
+      ctx.fillStyle = '#92400e';
+      for (let x = 8; x < 64; x += 16) {
+        ctx.fillRect(x, 4, 3, 28);
+      }
+      break;
+
+    case 'doorblock':
+      // DOORS heavy wooden panel door with brass handle and #0001 plate
+      ctx.fillStyle = '#451a03';
+      ctx.fillRect(0, 0, 64, 64);
+      // Wood border and inset panels
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(6, 6, 52, 24);
+      ctx.fillRect(6, 34, 52, 24);
+      ctx.fillStyle = '#542308';
+      ctx.fillRect(10, 10, 44, 16);
+      ctx.fillRect(10, 38, 44, 16);
+      // Brass door handle
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(48, 34, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#18181b';
+      ctx.fillRect(47, 34, 2, 4);
+      // Golden hotel room number plate (top)
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(22, 12, 20, 10);
+      ctx.fillStyle = '#18181b';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('DOOR', 32, 17);
+      break;
+
     default:
       ctx.fillStyle = '#64748b';
       ctx.fillRect(0, 0, 64, 64);

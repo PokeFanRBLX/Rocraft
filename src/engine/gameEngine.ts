@@ -112,16 +112,8 @@ export class RocraftGameEngine {
     // Physics
     this.physics = new PhysicsEngine(this.world, this.avatar, this.scene);
 
-    // Generate initial world preset
-    this.world.generatePreset(initialPreset);
-    this.physics.resetPlayerToSpawn();
-
-    if (initialPreset === 'arena') {
-      // Spawn some target dummies for fighting!
-      this.physics.spawnDummy(0, 1, 0, 'Training Dummy');
-      this.physics.spawnDummy(-6, 1, -4, 'Roblox Noob');
-      this.physics.spawnDummy(6, 1, 4, 'Roblox Champion');
-    }
+    // Generate initial world preset & set up atmosphere
+    this.loadPreset(initialPreset);
 
     // Raycaster & voxel highlight wireframe
     this.raycaster = new THREE.Raycaster();
@@ -173,6 +165,14 @@ export class RocraftGameEngine {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    // If typing in chat or another input field, do not register game keys
+    if (
+      document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement
+    ) {
+      return;
+    }
+
     this.keys[e.code] = true;
 
     // Hotbar selection 1-9
@@ -402,12 +402,13 @@ export class RocraftGameEngine {
     const strafe = (this.keys['KeyD'] || this.keys['ArrowRight'] ? 1 : 0) -
       (this.keys['KeyA'] || this.keys['ArrowLeft'] ? 1 : 0);
     const jump = !!this.keys['Space'];
+    const crouch = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['KeyQ'] || this.keys['KeyC']);
 
     const camDir = new THREE.Vector3();
     this.camera.getWorldDirection(camDir);
 
     // 3. Update Physics & Player
-    this.physics.update(delta, { forward, strafe, jump }, this.cameraYaw, camDir);
+    this.physics.update(delta, { forward, strafe, jump, crouch }, this.cameraYaw, camDir);
     this.world.update(delta);
 
     // 4. Update Camera Position & Orbit
@@ -494,7 +495,70 @@ export class RocraftGameEngine {
     }
   }
 
+  public loadPreset(preset: WorldPreset) {
+    this.world.generatePreset(preset);
+    this.physics.resetPlayerToSpawn();
+    this.physics.clearDummies();
+
+    if (preset === 'doors') {
+      const darkColor = new THREE.Color(0x0a0505);
+      this.scene.background = darkColor;
+      this.scene.fog = new THREE.FogExp2(0x0a0505, 0.022);
+      this.ambientLight.intensity = 0.28;
+      this.ambientLight.color.setHex(0xfef3c7);
+      this.sunLight.intensity = 0.35;
+      this.sunLight.color.setHex(0xffedd5);
+
+      // Spawn iconic DOORS entities as interactive test dummies
+      this.physics.spawnDummy(0, 1, 66, 'Figure (Entity)');
+      this.physics.spawnDummy(0, 1, 40, 'Seek (Entity)');
+      this.physics.spawnDummy(-3, 1, -7, 'El Goblino');
+
+      soundEngine.playDoorsSting();
+    } else if (preset === 'garden') {
+      const skyBlue = new THREE.Color(0x7dd3fc);
+      this.scene.background = skyBlue;
+      this.scene.fog = new THREE.FogExp2(0x7dd3fc, 0.008);
+      this.ambientLight.intensity = 0.6;
+      this.ambientLight.color.setHex(0xffffff);
+      this.sunLight.intensity = 1.35;
+      this.sunLight.color.setHex(0xfffaed);
+
+      // Spawn friendly farm helpers
+      this.physics.spawnDummy(0, 1, 4, 'Farmer Bob');
+      this.physics.spawnDummy(13, 2, 2, 'Botanist Lily');
+      this.physics.spawnDummy(-13, 2, 14, 'Melon Harvester');
+
+      soundEngine.playGardenWelcome();
+    } else if (preset === 'arena') {
+      const skyBlue = new THREE.Color(0x7dd3fc);
+      this.scene.background = skyBlue;
+      this.scene.fog = new THREE.FogExp2(0x7dd3fc, 0.012);
+      this.ambientLight.intensity = 0.45;
+      this.ambientLight.color.setHex(0xffffff);
+      this.sunLight.intensity = 1.2;
+      this.sunLight.color.setHex(0xfffaed);
+
+      this.physics.spawnDummy(0, 1, 0, 'Training Dummy');
+      this.physics.spawnDummy(-6, 1, -4, 'Roblox Noob');
+      this.physics.spawnDummy(6, 1, 4, 'Roblox Champion');
+    } else {
+      const skyBlue = new THREE.Color(0x7dd3fc);
+      this.scene.background = skyBlue;
+      this.scene.fog = new THREE.FogExp2(0x7dd3fc, 0.012);
+      this.ambientLight.intensity = 0.45;
+      this.ambientLight.color.setHex(0xffffff);
+      this.sunLight.intensity = 1.2;
+      this.sunLight.color.setHex(0xfffaed);
+    }
+  }
+
   private updateDayNight(delta: number) {
+    if (this.world.preset === 'doors') {
+      // Hotel interior remains atmospheric and mood-lit
+      return;
+    }
+
     this.dayTime = (this.dayTime + delta * this.dayCycleSpeed) % 1.0;
 
     const angle = this.dayTime * Math.PI * 2;
@@ -546,6 +610,7 @@ export class RocraftGameEngine {
     window.removeEventListener('mouseup', this.handleMouseUp);
     window.removeEventListener('mousemove', this.handleMouseMove);
     document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
+    this.physics.destroy();
     this.renderer.dispose();
   }
 }
